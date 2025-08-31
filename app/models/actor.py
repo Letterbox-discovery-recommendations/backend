@@ -1,8 +1,18 @@
-from pydantic import BaseModel, Field
+from typing import List, TYPE_CHECKING
+from sqlmodel import Relationship, SQLModel, Field
 
-class Actor(BaseModel):
-    id: int = Field(..., description="The unique identifier for the actor")
-    name: str = Field(..., description="The name of the actor")
-    age: int = Field(..., description="The age of the actor")
-    gender: str = Field(..., description="The gender of the actor")
-    role: str = Field(..., description="The role of the actor in the film")
+from .movie import MovieActorLink
+
+if TYPE_CHECKING:
+    from .movie import Movie
+
+
+class Actor(SQLModel, table=True):
+    id: int | None = Field(default=None, primary_key=True)
+    name: str
+    age: int
+    gender: str
+
+    movies: List["Movie"] = Relationship(
+        back_populates="cast", link_model=MovieActorLink
+    )

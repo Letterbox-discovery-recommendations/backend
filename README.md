@@ -30,20 +30,15 @@ La aplicación utiliza la API de The Movie Database (TMDB) para obtener informac
 ## Instalación
 
 1. Clona el repositorio
-2. Crea y activa un entorno virtual:
+2. Crea y activa un entorno virtual con las dependencias usando uv:
    ```powershell
-   python -m venv venv
-   .\venv\Scripts\activate
-   ```
-3. Instala dependencias:
-   ```powershell
-   pip install -r requirements.txt
+   uv sync
    ```
 
 ## Ejecución
 
 ```powershell
-uvicorn main:app --reload
+uv run uvicorn app.main:app --reload
 ```
 
 ## Testing
@@ -56,13 +51,3 @@ pytest
 
 La documentación de la API estará disponible en `/docs` y `/redoc` una vez iniciado el servidor.
 
-## Estructura de carpetas sugerida
-
-- `app/` Código fuente principal
-- `tests/` Pruebas
-- `requirements.txt` Dependencias
-- `docker/` Archivos de despliegue
-
-## Contribuir
-
-- Haz un fork o crea una branch para tu _feature o fix._

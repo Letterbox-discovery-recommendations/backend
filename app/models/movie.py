@@ -1,11 +1,32 @@
-from pydantic import BaseModel, Field
+from typing import List, TYPE_CHECKING
+from sqlmodel import Field, SQLModel, Relationship
 
-from app.models.actor import Actor
+if TYPE_CHECKING:
+    from .actor import Actor
+    from .genre import Genre
 
-class Movie(BaseModel):
-    id: int = Field(..., description="The unique identifier for the movie")
-    title: str = Field(..., description="The title of the movie")
-    description: str = Field(..., description="A brief description of the movie")
-    release_year: int = Field(..., description="The year the movie was released")
-    director: str = Field(..., description="The director of the movie")
-    cast: list[Actor] = Field(..., description="The cast of the movie")
+
+class MovieActorLink(SQLModel, table=True):
+    movie_id: int | None = Field(default=None, foreign_key="movie.id", primary_key=True)
+    actor_id: int | None = Field(default=None, foreign_key="actor.id", primary_key=True)
+
+
+class MovieGenreLink(SQLModel, table=True):
+    movie_id: int | None = Field(default=None, foreign_key="movie.id", primary_key=True)
+    genre_id: int | None = Field(default=None, foreign_key="genre.id", primary_key=True)
+
+
+class Movie(SQLModel, table=True):
+    id: int | None = Field(default=None, primary_key=True)
+    title: str
+    description: str
+    release_year: int
+    director: str
+    duration: int
+
+    cast: List["Actor"] = Relationship(
+        back_populates="movies", link_model=MovieActorLink
+    )
+    genres: List["Genre"] = Relationship(
+        back_populates="movies", link_model=MovieGenreLink
+    )
