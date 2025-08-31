@@ -10,4 +10,5 @@ dependencies = [
     "python-dotenv>=1.1.1",
     "ruff>=0.12.11",
     "sqlmodel>=0.0.24",
+    "strawberry-graphql[debug-server]>=0.281.0",
 ]
