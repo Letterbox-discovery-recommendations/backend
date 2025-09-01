@@ -18,11 +18,16 @@ class MovieGenreLink(SQLModel, table=True):
 
 class Movie(SQLModel, table=True):
     id: int | None = Field(default=None, primary_key=True)
-    title: str
+    title: str 
     description: str
     release_year: int
     director: str
     duration: int
+    platform: str
+    rating: float = Field(default=0.0, ge=0, le=5)
+
+
+
 
     cast: List["Actor"] = Relationship(
         back_populates="movies", link_model=MovieActorLink
