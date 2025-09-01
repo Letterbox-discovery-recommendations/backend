@@ -18,7 +18,7 @@ class MovieGenreLink(SQLModel, table=True):
 
 class Movie(SQLModel, table=True):
     id: int | None = Field(default=None, primary_key=True)
-    title: str
+    title: str = Field(nullable=False)
     description: str
     release_year: int
     director: str
