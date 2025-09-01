@@ -1,10 +1,23 @@
 [project]
 name = "discovery-recommendations"
 version = "0.1.0"
-description = "Add your description here"
+description = "Modulo de busqueda y recomendaciones"
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
+    "alembic>=1.16.5",
     "fastapi[standard]>=0.116.1",
+    "psycopg2>=2.9.10",
+    "pytest>=8.4.1",
+    "python-dotenv>=1.1.1",
     "ruff>=0.12.11",
+    "sqlmodel>=0.0.24",
+    "strawberry-graphql[debug-server]>=0.281.0",
 ]
+
+[build-system]
+requires = ["setuptools"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+include = ["app*"]

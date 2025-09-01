@@ -1,8 +1,5 @@
-# docker-compose.yml
-
-version: '3.8' # Versión del formato del archivo
-
 services:
+  db:
     image: postgres:15 
     restart: always 
     environment:
