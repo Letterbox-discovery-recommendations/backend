@@ -166,16 +166,5 @@ class Query:
         db_session.close()
         return results
 
-    @strawberry.field
-    def rating(self) -> List[float]:
-        """Obtiene una lista de todas las calificaciones de películas."""
-        db_session: Session = next(get_session())
-        
-        statement = select(Movie.rating).where(Movie.rating != None)
-        results = db_session.exec(statement).all()
-        db_session.close()
-        return results
-
-
 
 schema = strawberry.Schema(query=Query)
