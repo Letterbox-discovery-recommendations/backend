@@ -8,13 +8,13 @@ from app.graphql.schema import schema
 # Crea el router de GraphQL
 
 
-
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     create_db_and_tables()
     seed_initial_data()
     yield
     print("Apagando la aplicación...")
+
 
 graphql_app = GraphQLRouter(schema)
 
@@ -23,6 +23,7 @@ app = FastAPI(lifespan=lifespan)
 
 app.include_router(actores_router)
 app.include_router(graphql_app, prefix="/graphql")
+
 
 @app.get("/")
 def health_check():
