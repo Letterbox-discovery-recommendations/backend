@@ -116,10 +116,17 @@ def test_movie_model_invalid_rating():
     engine = create_engine("sqlite:///:memory:")
     SQLModel.metadata.create_all(engine)
     with Session(engine) as session:
-        movie = Movie(title="Bad Rating", description="", release_year=2020, director="X", duration=90, platform="HBO", rating=6)
-        session.add(movie)
         with pytest.raises(Exception):
-            session.commit()
+            movie = Movie.model_validate({
+                "title": "Bad Rating",
+                "description": "",
+                "release_year": 2020,
+                "director": "X",
+                "duration": 90,
+                "platform": "HBO",
+                "rating": 6
+            })
+        # No need to add or commit since validation fails at creation
 
 
 def test_genre_model_invalid():

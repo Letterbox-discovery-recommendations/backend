@@ -2,7 +2,7 @@ import strawberry
 from typing import List, Optional
 from sqlmodel import Session, select
 from sqlalchemy.orm import selectinload
-from app.models import Movie, Actor
+from app.models import Movie, Actor, Genre
 from app.db.config import get_session
 
 

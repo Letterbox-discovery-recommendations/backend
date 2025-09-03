@@ -49,6 +49,7 @@ def test_create_and_query_movie(session):
         release_year=2022,
         director="Dir",
         duration=90,
+        platform="Netflix",
     )
     session.add(movie)
     result = session.exec(select(Movie)).first()
@@ -57,6 +58,7 @@ def test_create_and_query_movie(session):
     assert result.release_year == 2022
     assert result.director == "Dir"
     assert result.duration == 90
+    assert result.platform == "Netflix"
     assert result.id is not None
 
 
@@ -71,6 +73,7 @@ def test_movie_actor_relationship(session):
         release_year=2022,
         director="Dir",
         duration=90,
+        platform="HBO",
     )
     session.add(actor)
     session.add(movie)
@@ -107,6 +110,7 @@ def test_movie_genre_relationship(session):
         release_year=2023,
         director="Dir2",
         duration=100,
+        platform="Amazon",
     )
     session.add(genre)
     session.add(movie)
@@ -143,6 +147,7 @@ def test_update_movie(session):
         release_year=2000,
         director="A",
         duration=100,
+        platform="Disney",
     )
     session.add(movie)
     session.commit()
