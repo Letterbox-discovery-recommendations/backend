@@ -54,6 +54,8 @@ def seed_initial_data():
                     "release_year": 1972,
                     "director": "Francis Ford Coppola",
                     "duration": 175,
+                    "platform": "Paramount Pictures",
+                    "rating": 4.6
                 },
                 "actors": [
                     {
@@ -74,6 +76,8 @@ def seed_initial_data():
                     "release_year": 2008,
                     "director": "Christopher Nolan",
                     "duration": 152,
+                    "platform": "Warner Bros.",
+                    "rating": 3.2
                 },
                 "actors": [
                     {"name": "Christian Bale", "age": 51, "gender": "M"},
@@ -93,6 +97,8 @@ def seed_initial_data():
                     "release_year": 1994,
                     "director": "Quentin Tarantino",
                     "duration": 154,
+                    "platform": "Miramax",
+                    "rating": 5.0
                 },
                 "actors": [
                     {"name": "John Travolta", "age": 71, "gender": "M"},
@@ -109,6 +115,8 @@ def seed_initial_data():
                     "release_year": 1994,
                     "director": "Robert Zemeckis",
                     "duration": 142,
+                    "platform": "Paramount Pictures",
+                    "rating": 2.8
                 },
                 "actors": [
                     {"name": "Tom Hanks", "age": 69, "gender": "M"},
@@ -125,6 +133,8 @@ def seed_initial_data():
                     "release_year": 2010,
                     "director": "Christopher Nolan",
                     "duration": 148,
+                    "platform": "Warner Bros.",
+                    "rating": 3.7
                 },
                 "actors": [
                     {"name": "Leonardo DiCaprio", "age": 50, "gender": "M"},
@@ -141,11 +151,48 @@ def seed_initial_data():
             },
             {
                 "movie": {
+                    "title": "The Social Network",
+                    "description": "As Harvard students and friends Mark Zuckerberg and Eduardo Saverin create the social networking site that would become Facebook, they must deal with personal and legal complications.",
+                    "release_year": 2010,
+                    "director": "David Fincher",
+                    "duration": 120,
+                    "platform": "Columbia Pictures",
+                    "rating": 4.5
+                },
+                "actors": [
+                    {"name": "Jesse Eisenberg", "age": 40, "gender": "M"},
+                    {"name": "Andrew Garfield", "age": 40, "gender": "M"},
+                    {"name": "Justin Timberlake", "age": 42, "gender": "M"},
+                    {"name": "Rooney Mara", "age": 38, "gender": "F"},
+                ],
+                "genres": ["Biography", "Drama"],
+            },
+            {
+                "movie": {
+                    "title": "Star Wars",
+                    "description": "In a galaxy far, far away, a group of rebels band together to fight the evil Galactic Empire.",
+                    "release_year": 1977,
+                    "director": "George Lucas",
+                    "duration": 121,
+                    "platform": "20th Century Fox",
+                    "rating": 4.5
+                },
+                "actors": [
+                    {"name": "Mark Hamill", "age": 70, "gender": "M"},
+                    {"name": "Harrison Ford", "age": 81, "gender": "M"},
+                    {"name": "Carrie Fisher", "age": 60, "gender": "F"},
+                ],
+                "genres": ["Action", "Adventure", "Fantasy"],
+            },
+            {
+                "movie": {
                     "title": "The Matrix",
                     "description": "A computer hacker learns from mysterious rebels about the true nature of his reality and his role in the war against its controllers.",
                     "release_year": 1999,
                     "director": "Wachowskis",
                     "duration": 136,
+                    "platform": "Warner Bros.",
+                    "rating": 1.7
                 },
                 "actors": [
                     {"name": "Keanu Reeves", "age": 61, "gender": "M"},

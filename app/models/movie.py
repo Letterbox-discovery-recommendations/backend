@@ -1,5 +1,6 @@
 from typing import List, TYPE_CHECKING
 from sqlmodel import Field, SQLModel, Relationship
+from pydantic import field_validator
 
 if TYPE_CHECKING:
     from .actor import Actor
@@ -23,6 +24,15 @@ class Movie(SQLModel, table=True):
     release_year: int
     director: str
     duration: int
+    platform: str
+    rating: float = Field(default=0.0, ge=0, le=5)
+
+    @field_validator('rating')
+    @classmethod
+    def validate_rating(cls, v):
+        if not (0 <= v <= 5):
+            raise ValueError("Rating must be between 0 and 5")
+        return v
 
     cast: List["Actor"] = Relationship(
         back_populates="movies", link_model=MovieActorLink

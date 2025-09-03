@@ -116,3 +116,66 @@ def test_query_actors_filter():
     assert "actors" in result["data"]
     for actor in result["data"]["actors"]:
         assert "Marlon Brando" in actor["name"]
+
+def test_query_movies_advanced_filters():
+    """
+    Valida que los filtros avanzados de la query movies funcionan correctamente.
+    """
+    query = '''
+    query {
+      movies(minRating: 4, maxRating: 5, platform: "Netflix", minYear: 2000, maxYear: 2025, genre: "Drama", minDuration: 90, maxDuration: 200, limit: 2, sort: "rating_desc") {
+        id
+        title
+        rating
+        platform
+        releaseYear
+      }
+    }
+    '''
+    response = client.post("/graphql", json={"query": query})
+    result = response.json()
+    assert "errors" not in result
+    assert "movies" in result["data"]
+    for movie in result["data"]["movies"]:
+        assert 4 <= movie["rating"] <= 5
+        assert movie["platform"] == "Netflix"
+        assert 2000 <= movie["releaseYear"] <= 2025
+
+
+def test_query_movies_invalid_filters():
+    """
+    Valida que la query movies devuelve error si los filtros son inválidos.
+    """
+    query = '''
+    query {
+      movies(minYear: 2025, maxYear: 2000) {
+        id
+      }
+    }
+    '''
+    response = client.post("/graphql", json={"query": query})
+    result = response.json()
+    assert "errors" in result
+
+
+def test_query_genres():
+    """
+    Valida que la query genres devuelve una lista de géneros con sus películas.
+    """
+    query = '''
+    query {
+      genres {
+        id
+        name
+        movies { id title }
+      }
+    }
+    '''
+    response = client.post("/graphql", json={"query": query})
+    result = response.json()
+    assert "errors" not in result
+    assert "genres" in result["data"]
+    for genre in result["data"]["genres"]:
+        assert "id" in genre
+        assert "name" in genre
+        assert isinstance(genre["movies"], list)
