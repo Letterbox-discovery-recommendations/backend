@@ -7,10 +7,12 @@ requires-python = ">=3.12"
 dependencies = [
     "alembic>=1.16.5",
     "fastapi[standard]>=0.116.1",
+    "numpy>=2.3.2",
     "psycopg2>=2.9.10",
     "pytest>=8.4.1",
     "python-dotenv>=1.1.1",
     "ruff>=0.12.11",
+    "scikit-learn>=1.7.1",
     "sqlmodel>=0.0.24",
     "strawberry-graphql[debug-server]>=0.281.0",
 ]
