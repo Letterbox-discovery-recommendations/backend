@@ -1,7 +1,7 @@
 import os
 from dotenv import load_dotenv, find_dotenv
 from sqlmodel import create_engine, SQLModel, Session, select
-from app.models import Actor, Movie, Genre
+from app.models import Actor, Movie, Genre, Review  # noqa: F401
 
 
 load_dotenv(find_dotenv())
@@ -174,6 +174,7 @@ def seed_initial_data():
         session.add_all(actor_map.values())
         session.commit()
 
+
         for item in movies_with_details:
             movie_genres = [genre_map[genre_name] for genre_name in item["genres"]]
             movie_cast = [
@@ -182,6 +183,17 @@ def seed_initial_data():
 
             movie = Movie(**item["movie"], genres=movie_genres, cast=movie_cast)
             session.add(movie)
+            session.commit()
+            session.refresh(movie)
+            print(movie_genres)
+            if item["movie"]["title"] in ["The Dark Knight","Pulp Fiction"]:
+
+                review = Review(
+                    movie_id=movie.id,
+                    user_id=1,
+                    rating=5,
+                )
+                session.add(review)
 
         session.commit()
         print("Datos iniciales realistas y precisos han sido añadidos exitosamente.")
