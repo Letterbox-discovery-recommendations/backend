@@ -1,8 +1,33 @@
+from contextlib import asynccontextmanager
 from fastapi import FastAPI
+from app.db.config import create_db_and_tables, seed_initial_data
+from app.routers import actores_router
 
-app = FastAPI()
+from app.routers.recommendations import router as recommendations_router
+from strawberry.fastapi import GraphQLRouter
+from app.graphql.schema import schema
+
+# Crea el router de GraphQL
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    create_db_and_tables()
+    seed_initial_data()
+    yield
+    print("Apagando la aplicación...")
+
+
+graphql_app = GraphQLRouter(schema)
+
+
+app = FastAPI(lifespan=lifespan)
+
+app.include_router(actores_router)
+app.include_router(recommendations_router)
+app.include_router(graphql_app, prefix="/graphql")
 
 
 @app.get("/")
 def health_check():
-  return {"status": "Server working great!"}
+    return {"status": "Server working great!"}
