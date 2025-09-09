@@ -6,7 +6,7 @@ on:
     branches: [ integracion-deploy ]
 
 jobs:
-  test:
+  build-python:
     runs-on: ubuntu-latest
     
     steps:
@@ -41,7 +41,7 @@ jobs:
 
   build-docker:
     runs-on: ubuntu-latest
-    needs: test
+    needs: build-python
     
     outputs:
       image-tag: ${{ steps.build-image.outputs.image-tag }}
@@ -80,7 +80,6 @@ jobs:
     - name: Save Docker image
       run: |
         docker save fastapi-lambda:${{ steps.build-image.outputs.image-tag }} -o /tmp/fastapi-lambda.tar
-      # <-- Aquí guardamos el tar (tu versión actual se olvidaba de hacer el save)
       
     - name: Upload image artifact
       uses: actions/upload-artifact@v4
