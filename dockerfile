@@ -10,11 +10,8 @@ RUN pip install --no-cache-dir uv \
 
 COPY . .
 
-ADD https://github.com/awslabs/aws-lambda-web-adapter/releases/download/v0.9.0/aws-lambda-adapter \
-    /opt/extensions/aws-lambda-adapter
+COPY --from=public.ecr.aws/awsguru/aws-lambda-adapter:0.9.1 /lambda-adapter /opt/extensions/lambda-adapter
 
-RUN chmod +x /opt/extensions/aws-lambda-adapter
-
-EXPOSE 8080
+ENV PORT=8080
 
 CMD ["main.app"]
