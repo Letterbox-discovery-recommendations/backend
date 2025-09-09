@@ -2,7 +2,7 @@ FROM python:3.12-slim AS base
 
 RUN curl -LsSf https://astral.sh/uv/install.sh | sh
 COPY pyproject.toml uv.lock ./
-RUN uv sync
+RUN /root/.cargo/bin/uv sync
 
 COPY app ./
 COPY alembic.ini alembic ./
