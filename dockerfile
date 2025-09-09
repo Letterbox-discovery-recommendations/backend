@@ -1,11 +1,11 @@
-FROM python:3.12-slim
+FROM python:3.12-slim AS base
 
 RUN curl -LsSf https://astral.sh/uv/install.sh | sh
+COPY pyproject.toml uv.lock ./
 RUN uv sync
 
-COPY pyproject.toml uv.lock
-COPY ./app
-COPY alembic.ini ./alembic 
+COPY app ./
+COPY alembic.ini alembic ./
 COPY --from=public.ecr.aws/awsguru/aws-lambda-adapter:0.9.1 /lambda-adapter /opt/extensions/lambda-adapter
 
 EXPOSE 8080
