@@ -1,9 +1,15 @@
-FROM python:3.12-slim AS base
+FROM python:3.12-slim-trixie AS base
 
-RUN curl -LsSf https://astral.sh/uv/install.sh | sh \
- && cp /root/.cargo/bin/uv /usr/local/bin/
+RUN apt-get update && apt-get install -y --no-install-recommends curl ca-certificates
+
+ADD https://astral.sh/uv/install.sh /uv-installer.sh
+RUN sh /uv-installer.sh && rm /uv-installer.sh
+ENV PATH="/root/.local/bin/:$PATH"
+
+WORKDIR /app
+
 COPY pyproject.toml uv.lock ./
-RUN /root/.cargo/bin/uv sync
+RUN uv sync --frozen
 
 COPY app ./
 COPY alembic.ini alembic ./
