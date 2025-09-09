@@ -45,7 +45,7 @@ jobs:
       run: uv run alembic upgrade head
       
     - name: Run tests
-      run: uv run pytest --maxfail=5 --maxwarnings=5
+      run: uv run pytest --maxfail=5 --tb=short
       
     - name: Check test coverage
       run: uv run pytest --cov=app --cov-report=term-missing --cov-fail-under=85
