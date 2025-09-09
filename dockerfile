@@ -1,11 +1,11 @@
 FROM python:3.12-slim-trixie AS base
-FROM ghcr.io/astral-sh/uv:latest AS uv
+FROM ghcr.io/astral-sh/uv:latest AS uvstage
 
 WORKDIR /app
 
 RUN apt-get update && apt-get install -y --no-install-recommends curl ca-certificates
 
-COPY --from=uv /uv /bin/uv
+COPY --from=uvstage /uv /bin/uv
 
 COPY pyproject.toml uv.lock ./
 RUN uv sync --frozen
