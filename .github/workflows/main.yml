@@ -67,6 +67,7 @@ jobs:
         IMAGE_NAME="fastapi-lambda"
         
         docker build \
+          -f Dockerfile \
           -t $IMAGE_NAME:$IMAGE_TAG \
           -t $IMAGE_NAME:$BRANCH_NAME \
           .
@@ -81,10 +82,13 @@ jobs:
         echo "image-name=$IMAGE_NAME" >> $GITHUB_OUTPUT
         
     - name: Save Docker image
+      run: |
+        docker save fastapi-lambda:${{ steps.build-image.outputs.image-tag }} -o /tmp/fastapi-lambda.tar
+      # <-- Aquí guardamos el tar (tu versión actual se olvidaba de hacer el save)
+      
+    - name: Upload image artifact
       uses: actions/upload-artifact@v4
       with:
         name: docker-image-${{ steps.build-image.outputs.image-tag }}
         path: /tmp/fastapi-lambda.tar
         retention-days: 1
-      env:
-          IMAGE_TAG: ${{ steps.build-image.outputs.image-tag }}
