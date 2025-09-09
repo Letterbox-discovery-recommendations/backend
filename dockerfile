@@ -2,10 +2,13 @@ FROM public.ecr.aws/lambda/python:3.12
 
 RUN pip install uv
 
+RUN yum install -y gcc postgresql15-devel \
+    && yum clean all \
+    && rm -rf /var/cache/yum
+
 COPY pyproject.toml uv.lock ./
 
-RUN pip install --no-cache-dir uv \
-    && uv pip install --system -r pyproject.toml \
+RUN uv pip install --system -r pyproject.toml \
     && uv pip install --system -e ".[dev]"
 
 COPY . .
