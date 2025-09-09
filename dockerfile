@@ -1,6 +1,7 @@
 FROM python:3.12-slim AS base
 
-RUN curl -LsSf https://astral.sh/uv/install.sh | sh
+RUN curl -LsSf https://astral.sh/uv/install.sh | sh \
+ && cp /root/.cargo/bin/uv /usr/local/bin/
 COPY pyproject.toml uv.lock ./
 RUN /root/.cargo/bin/uv sync
 
