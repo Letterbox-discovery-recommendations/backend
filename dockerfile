@@ -1,9 +1,11 @@
 FROM public.ecr.aws/lambda/python:3.12
 
-COPY . .
+RUN yum install -y postgresql-devel gcc python3-devel make && yum clean all
 
-RUN pip install uv
-RUN uv sync
+COPY pyproject.toml uv.lock ./
+RUN pip install uv && uv sync --frozen
+
+COPY . .
 
 COPY --from=public.ecr.aws/awsguru/aws-lambda-adapter:0.9.1 /lambda-adapter /opt/extensions/lambda-adapter
 
