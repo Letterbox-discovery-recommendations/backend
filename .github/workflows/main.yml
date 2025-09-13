@@ -2,8 +2,6 @@ name: CI Backend
 on:
   pull_request:
     branches: [ main ]
-  push:
-    branches: [ integracion-deploy ]
 
 jobs:
   build-python:
