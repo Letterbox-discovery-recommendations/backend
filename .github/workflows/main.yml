@@ -4,7 +4,7 @@ on:
     branches: [ main ]
   workflow_dispatch:
   push:
-    branches: [ integracion-deploy ]
+    branches: [ integracion-deploy , main ]
 
 jobs:
   build-python:
