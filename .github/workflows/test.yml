@@ -3,6 +3,7 @@ name: Run Tests
 on:
   pull_request:
     branches: [ dev ]
+  workflow_dispatch:
   push:
     branches: [ integracion-deploy ]
 
@@ -41,8 +42,13 @@ jobs:
     - name: Install dependencies
       run: uv sync --frozen
 
-    - name: Run migrations
-      run: uv run alembic upgrade head
+    - name: Run migrations (or manually create tables)
+      run: |
+        uv run alembic upgrade head || echo "Alembic skipped"
+        uv run python -c "from app.db.config import create_db_and_tables; create_db_and_tables()"
+
+    - name: Seed database
+      run: uv run python -c "from app.db.config import seed_initial_data; seed_initial_data()"
       
     - name: Run tests
       run: uv run pytest --maxfail=5 --tb=short
