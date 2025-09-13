@@ -2,7 +2,6 @@ from sqlmodel import Session, select
 import numpy as np
 from app.models import Movie, Review, Genre
 from sklearn.metrics.pairwise import cosine_similarity
-
 positive_rating_threshold = 4.0
 
 
@@ -20,6 +19,8 @@ class Recommendations:
         self.db_session = db_session
 
     def get_user_recommendations(self, user_id: int = 1):
+
+
         user_reviews_query = select(Review).where(
             Review.user_id == user_id, Review.rating >= positive_rating_threshold
         )
@@ -30,6 +31,7 @@ class Recommendations:
         return user_liked_movie_ids
 
     def get_movie_vectors(self, all_movies):
+
         all_genre_names = sorted(
             [genre.name for genre in self.db_session.exec(select(Genre)).all()]
         )

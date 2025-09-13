@@ -2,161 +2,169 @@ import strawberry
 from typing import List, Optional
 from sqlmodel import Session, select
 from sqlalchemy.orm import selectinload
-from datetime import date
-
-# Importa los nuevos modelos de la base de datos
+from app.models import Movie, Actor, Genre
 from app.db.config import get_session
-from app.models import (
-    Movie as DBMovie,
-    RealPerson as DBRealPerson,
-
-    CastLink as DBCastLink,
-)
 
 
-
-
+# Para evitar dependencias circulares al definir las relaciones,
+# usamos strawberry.LazyType.
 @strawberry.type
-class RealPersonType:
-    """Representa a una persona (actor o director) en el sistema."""
+class ActorType:
     id: int
-    nombre: str
-    imagenUrl: Optional[str]
-    genero: int
+    name: str
+    age: int
+    gender: str
 
-
-@strawberry.type
-class PlatformType:
-    """Representa una plataforma de streaming."""
-
-    id: int
-    nombre: str
-    logoUrl: Optional[str]
-
-
-@strawberry.type
-class CastLinkType:
-    """
-    Representa la participación de un actor en una película,
-    incluyendo el personaje que interpreta.
-    """
-
-    personaje: str
-    orden: int
-
+    # Resolver para obtener las películas de este actor
     @strawberry.field
-    def actor(self) -> RealPersonType:
-        """Resuelve la persona real que interpreta el papel."""
-        return self.person  # type: ignore
+    def movies(self) -> List["MovieType"]:
+        return self.movies # type: ignore
 
-
-# --- 2. Tipos Actualizados 🔄 ---
-
+    # Resolver para obtener en que años ha actuado este actor
+    @strawberry.field
+    def years_active(self) -> List[int]:
+        return [movie.release_year for movie in self.movies] # type: ignore
 
 @strawberry.type
 class GenreType:
-    """Representa un género de película."""
     id: int
-    nombre: str  # name -> nombre
+    name: str
+
+    # Resolver para obtener las películas de este género
+    @strawberry.field
+    def movies(self) -> List["MovieType"]:
+        return self.movies  # type: ignore
 
 
 @strawberry.type
 class MovieType:
-    """Representa una película con todos sus detalles."""
-
     id: int
-    titulo: str
-    sinopsis: str
-    duracionMinutos: int
-    fechaEstreno: Optional[date]
-    posterUrl: Optional[str]
+    title: str
+    description: str
+    release_year: int
+    director: str
+    duration: int
+    platform: str
+    rating: float
+    is_high_rated: bool
 
-    # Relaciones actualizadas
+
+
+    # Resolver para obtener el elenco de esta película
     @strawberry.field
-    def director(self) -> RealPersonType:
-        """El director de la película."""
-        return self.director  # type: ignore
+    def cast(self) -> List[ActorType]:
+        return self.cast # type: ignore
 
+    # Resolver para obtener los géneros de esta película
     @strawberry.field
-    def generos(self) -> List[GenreType]:
-        """Los géneros de la película."""
-        return self.generos  # type: ignore
+    def genres(self) -> List[GenreType]:
+        return self.genres # type: ignore
 
+    # Resolver para obtener la plataforma de esta película
     @strawberry.field
-    def plataformas(self) -> List[PlatformType]:
-        """Las plataformas donde la película está disponible."""
-        return self.plataformas  # type: ignore
+    def platform(self) -> str:
+        return self.platform # type: ignore
 
+    # Resolver para obtener la calificación de esta película
     @strawberry.field
-    def elenco(self) -> List[CastLinkType]:
-        """El elenco de la película, incluyendo el personaje y orden."""
-        return self.cast_links  # type: ignore
-
-
-# --- 3. Query Actualizada y Optimizada ⚙️ ---
-
+    def rating(self) -> float:
+        return self.rating # type: ignore
+    
+    @strawberry.field
+    def is_high_rated(self) -> bool:
+        return self.rating >= 4.0 #type: ignore
 
 @strawberry.type
 class Query:
     @strawberry.field
-    def peliculas(self, titulo: Optional[str] = None) -> List[MovieType]:
-        """Obtiene una lista de películas, opcionalmente filtrada por título."""
+    def movies(self, title: Optional[str] = None, platform: Optional[str] = None, max_rating: Optional[float] = None, min_rating: Optional[float] = None, min_year: Optional[int] = None, max_year: Optional[int] = None, genre: Optional[str] = None, min_duration: Optional[int] = None, max_duration: Optional[int] = None, limit: Optional[int] = None, sort: Optional[str] = None) -> List["MovieType"]:
+        """Obtiene una lista de películas, opcionalmente filtrada por título y calificación mínima."""
         db_session: Session = next(get_session())
+        
+        # Validaciones
+        if max_duration and min_duration and max_duration < min_duration:
+            raise ValueError("La duración máxima no puede ser menor que la duración mínima.")
+        if max_year and min_year and max_year < min_year:
+            raise ValueError("El año máximo no puede ser menor que el año mínimo.")
+        if min_rating and max_rating and max_rating < min_rating:
+            raise ValueError("La calificación máxima no puede ser menor que la calificación mínima.")
 
-        # El statement ahora carga todas las relaciones necesarias de una sola vez
-        # para evitar múltiples consultas a la base de datos (problema N+1)
-        statement = select(DBMovie).options(
-            selectinload(DBMovie.director),
-            selectinload(DBMovie.generos),
-            selectinload(DBMovie.plataformas),
-            # Carga anidada: carga los enlaces del elenco Y la persona en cada enlace
-            selectinload(DBMovie.cast_links).selectinload(DBCastLink.person),
+        if limit and limit <= 0:
+            raise ValueError("El límite debe ser mayor que 0.")
+
+        if min_year and min_year < 1888:
+            raise ValueError("El año mínimo no puede ser menor que 1888.")
+        
+    
+        statement = select(Movie).options(
+            selectinload(Movie.cast),  # type: ignore
+            selectinload(Movie.genres),  # type: ignore
         )
+        if title:
+            statement = statement.where(Movie.title.contains(title)) # type: ignore
 
-        if titulo:
-            statement = statement.where(
-                DBMovie.titulo.icontains(titulo)
-            )
-
-        results = db_session.exec(statement).unique().all()
-        db_session.close()
-        return results  # type: ignore
-
-    @strawberry.field
-    def plataformas(self) -> List[PlatformType]:
-        return self.plataformas # type: ignore
-
-    @strawberry.field
-    def personas(self, nombre: Optional[str] = None) -> List[RealPersonType]:
-        """Obtiene una lista de personas (actores/directores)."""
-        db_session: Session = next(get_session())
-
-        statement = select(DBRealPerson)
-        if nombre:
-            statement = statement.where(DBRealPerson.nombre.icontains(nombre))
+        if max_rating:
+            statement = statement.where(Movie.rating <= max_rating) # type: ignore
+        if min_rating:
+            statement = statement.where(Movie.rating >= min_rating) # type: ignore
+        if min_year:
+            statement = statement.where(Movie.release_year >= min_year) # type: ignore
+        if max_year:
+            statement = statement.where(Movie.release_year <= max_year) # type: ignore
+        if genre:
+            statement = statement.where(Movie.genres.any(Genre.name == genre)) # type: ignore
+        if max_duration:
+            statement = statement.where(Movie.duration <= max_duration) # type: ignore
+        if min_duration:
+            statement = statement.where(Movie.duration >= min_duration) # type: ignore
+        if platform:
+            statement = statement.where(Movie.platform == platform) # type: ignore
+        if limit:
+            statement = statement.limit(limit) # type: ignore
+        if sort:
+            if sort == "year_desc":
+                statement = statement.order_by(Movie.release_year.desc())  # Año descendente 
+            elif sort == "year_asc":
+                statement = statement.order_by(Movie.release_year.asc())  # Año ascendente
+            elif sort == "duration_asc":
+                statement = statement.order_by(Movie.duration.asc())  # Duración ascendente
+            elif sort == "duration_desc":
+                statement = statement.order_by(Movie.duration.desc())  # Duración descendente
+            elif sort == "rating_desc":
+                statement = statement.order_by(Movie.rating.desc())  # Rating descendente
+            elif sort == "rating_asc":
+                statement = statement.order_by(Movie.rating.asc())  # Rating ascendente
+            elif sort == "title_asc":
+                statement = statement.order_by(Movie.title.asc())  # Título ascendente
+            elif sort == "title_desc":
+                statement = statement.order_by(Movie.title.desc())  # Título descendente
 
         results = db_session.exec(statement).all()
         db_session.close()
         return results  # type: ignore
 
     @strawberry.field
-    def pelicula(self, id: int) -> Optional[MovieType]:
-        """Obtiene una película por su ID."""
+    def actors(self, name: Optional[str] = None) -> List["ActorType"]:
+        """Obtiene una lista de actores, opcionalmente filtrada por nombre."""
         db_session: Session = next(get_session())
 
-        statement = (
-            select(DBMovie)
-            .options(
-                selectinload(DBMovie.director),
-                selectinload(DBMovie.generos),
-                selectinload(DBMovie.plataformas),
-                selectinload(DBMovie.cast_links).selectinload(DBCastLink.person),
-            )
-            .where(DBMovie.id == id)
-        )
+        statement = select(Actor).options(selectinload(Actor.movies))  # type: ignore
+        if name:
+            statement = statement.where(Actor.name.contains(name))  # type: ignore
 
-        result = db_session.exec(statement).first()
+        results = db_session.exec(statement).all()
         db_session.close()
-        return result # type: ignore
+        return results # type: ignore
+    
+    @strawberry.field
+    def genres(self, name: Optional[str] = None) -> List["GenreType"]:
+        """Obtiene una lista de géneros, opcionalmente filtrada por nombre."""
+        db_session: Session = next(get_session())
+        
+        statement = select(Genre).options(selectinload(Genre.movies))
+        results = db_session.exec(statement).all()
+        db_session.close()
+        return results
+
 
 schema = strawberry.Schema(query=Query)

@@ -1,16 +1,18 @@
 from typing import List, TYPE_CHECKING
 from sqlmodel import Relationship, SQLModel, Field
 
-from .links import MoviePlatformLink
+from .movie import MovieActorLink
 
 if TYPE_CHECKING:
     from .movie import Movie
 
-class Platform(SQLModel, table=True):
+
+class Actor(SQLModel, table=True):
     id: int | None = Field(default=None, primary_key=True)
-    nombre: str
-    logoUrl: str | None = None
+    name: str
+    age: int
+    gender: str
 
     movies: List["Movie"] = Relationship(
-        back_populates="plataformas", link_model=MoviePlatformLink
+        back_populates="cast", link_model=MovieActorLink
     )

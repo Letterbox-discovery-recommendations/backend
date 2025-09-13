@@ -1,33 +1,42 @@
 from typing import List, TYPE_CHECKING
 from sqlmodel import Field, SQLModel, Relationship
-from datetime import date
-
-
-from .links import CastLink, MovieGenreLink, MoviePlatformLink
+from pydantic import field_validator
 
 if TYPE_CHECKING:
-    from .real_person import RealPerson
+    from .actor import Actor
     from .genre import Genre
-    from .platform import Platform
+
+
+class MovieActorLink(SQLModel, table=True):
+    movie_id: int | None = Field(default=None, foreign_key="movie.id", primary_key=True)
+    actor_id: int | None = Field(default=None, foreign_key="actor.id", primary_key=True)
+
+
+class MovieGenreLink(SQLModel, table=True):
+    movie_id: int | None = Field(default=None, foreign_key="movie.id", primary_key=True)
+    genre_id: int | None = Field(default=None, foreign_key="genre.id", primary_key=True)
 
 
 class Movie(SQLModel, table=True):
     id: int | None = Field(default=None, primary_key=True)
-    titulo: str = Field(index=True)
-    sinopsis: str
-    duracionMinutos: int
-    fechaEstreno: date | None = None
-    posterUrl: str | None = None
-    director_id: int | None = Field(default=None, foreign_key="realperson.id")
+    title: str = Field(nullable=False)
+    description: str
+    release_year: int
+    director: str
+    duration: int
+    platform: str
+    rating: float = Field(default=0.0, ge=0, le=5)
 
-    director: "RealPerson" = Relationship(back_populates="movies_directed")
+    @field_validator('rating')
+    @classmethod
+    def validate_rating(cls, v):
+        if not (0 <= v <= 5):
+            raise ValueError("Rating must be between 0 and 5")
+        return v
 
-    cast_links: List["CastLink"] = Relationship(back_populates="movie")
-
-    generos: List["Genre"] = Relationship(
-        back_populates="movies", link_model=MovieGenreLink
+    cast: List["Actor"] = Relationship(
+        back_populates="movies", link_model=MovieActorLink
     )
-
-    plataformas: List["Platform"] = Relationship(
-        back_populates="movies", link_model=MoviePlatformLink
+    genres: List["Genre"] = Relationship(
+        back_populates="movies", link_model=MovieGenreLink
     )
