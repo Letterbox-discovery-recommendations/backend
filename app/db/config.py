@@ -1,27 +1,28 @@
 import os
-from dotenv import load_dotenv, find_dotenv
+import json
+from pathlib import Path 
+from dotenv import load_dotenv
 from sqlmodel import create_engine, SQLModel, Session, select
-from app.models import Actor, Movie, Genre, Review  # noqa: F401
 
 
-load_dotenv(find_dotenv())
 
-db_user = os.getenv("DB_USER")
-db_password = os.getenv("DB_PASSWORD")
-db_name = os.getenv("DB_NAME")
-db_host = os.getenv("DB_HOST", "localhost")
-db_port = os.getenv("DB_PORT", "5432")
-
-if not all([db_user, db_password, db_name]):
-    raise ValueError(
-        "Faltan variables de entorno para la base de datos (DB_USER, DB_PASSWORD, DB_NAME)"
-    )
+from app.models import (
+    Movie as DBMovie,
+    RealPerson,
+    Genre,
+    Platform,
+    CastLink,
+    PydanticMovie
+)
 
 
-DATABASE_URL = f"postgresql://{db_user}:{db_password}@{db_host}:{db_port}/{db_name}"
-
-
+load_dotenv()
+DATABASE_URL = f"postgresql://{os.getenv('DB_USER')}:{os.getenv('DB_PASSWORD')}@{os.getenv('DB_HOST')}/{os.getenv('DB_NAME')}"
 engine = create_engine(DATABASE_URL)
+
+def get_session():
+    with Session(engine) as session:
+        yield session
 
 
 def create_db_and_tables():
@@ -30,217 +31,124 @@ def create_db_and_tables():
     print("Tablas creadas exitosamente.")
 
 
-def get_session():
-    with Session(engine) as session:
-        yield session
-
-
-def seed_initial_data():
+def get_or_create(session: Session, model, **kwargs):
     """
-    Añade datos iniciales realistas (actores con edad/género, géneros, películas y sus relaciones)
-    a la base de datos si está vacía.
+    Busca una instancia. Si no existe, la crea y la AÑADE a la sesión actual,
+    pero NO hace commit. El commit se hará fuera de esta función.
     """
-    with Session(engine) as session:
-        if session.exec(select(Movie).limit(1)).first():
-            print("La base de datos ya contiene datos. No se añaden datos iniciales.")
-            return
+    defaults = kwargs.pop("defaults", {})
+    instance = session.exec(select(model).filter_by(**kwargs)).first()
 
-        print("Base de datos vacía. Añadiendo datos iniciales realistas y precisos...")
-        movies_with_details = [
-            {
-                "movie": {
-                    "title": "The Godfather",
-                    "description": "The aging patriarch of an organized crime dynasty transfers control of his clandestine empire to his reluctant son.",
-                    "release_year": 1972,
-                    "director": "Francis Ford Coppola",
-                    "duration": 175,
-                    "platform": "Paramount Pictures",
-                    "rating": 4.6
-                },
-                "actors": [
-                    {
-                        "name": "Marlon Brando",
-                        "age": 80,
-                        "gender": "M",
-                    },  # Edades calculadas a la fecha de fallecimiento o actuales
-                    {"name": "Al Pacino", "age": 85, "gender": "M"},
-                    {"name": "James Caan", "age": 82, "gender": "M"},
-                    {"name": "Diane Keaton", "age": 79, "gender": "F"},
-                ],
-                "genres": ["Crime", "Drama"],
-            },
-            {
-                "movie": {
-                    "title": "The Dark Knight",
-                    "description": "When the menace known as the Joker wreaks havoc and chaos on the people of Gotham, Batman must accept one of the greatest psychological and physical tests of his ability to fight injustice.",
-                    "release_year": 2008,
-                    "director": "Christopher Nolan",
-                    "duration": 152,
-                    "platform": "Warner Bros.",
-                    "rating": 3.2
-                },
-                "actors": [
-                    {"name": "Christian Bale", "age": 51, "gender": "M"},
-                    {"name": "Heath Ledger", "age": 28, "gender": "M"},
-                    {"name": "Aaron Eckhart", "age": 57, "gender": "M"},
-                    {"name": "Michael Caine", "age": 92, "gender": "M"},
-                    {"name": "Maggie Gyllenhaal", "age": 47, "gender": "F"},
-                    {"name": "Gary Oldman", "age": 67, "gender": "M"},
-                    {"name": "Morgan Freeman", "age": 88, "gender": "M"},
-                ],
-                "genres": ["Action", "Crime", "Drama", "Thriller"],
-            },
-            {
-                "movie": {
-                    "title": "Pulp Fiction",
-                    "description": "The lives of two mob hitmen, a boxer, a gangster and his wife, and a pair of diner bandits intertwine in four tales of violence and redemption.",
-                    "release_year": 1994,
-                    "director": "Quentin Tarantino",
-                    "duration": 154,
-                    "platform": "Miramax",
-                    "rating": 5.0
-                },
-                "actors": [
-                    {"name": "John Travolta", "age": 71, "gender": "M"},
-                    {"name": "Uma Thurman", "age": 55, "gender": "F"},
-                    {"name": "Samuel L. Jackson", "age": 76, "gender": "M"},
-                    {"name": "Bruce Willis", "age": 70, "gender": "M"},
-                ],
-                "genres": ["Crime", "Drama"],
-            },
-            {
-                "movie": {
-                    "title": "Forrest Gump",
-                    "description": "The presidencies of Kennedy and Johnson, the Vietnam War, and other historical events unfold from the perspective of an Alabama man with an IQ of 75.",
-                    "release_year": 1994,
-                    "director": "Robert Zemeckis",
-                    "duration": 142,
-                    "platform": "Paramount Pictures",
-                    "rating": 2.8
-                },
-                "actors": [
-                    {"name": "Tom Hanks", "age": 69, "gender": "M"},
-                    {"name": "Robin Wright", "age": 59, "gender": "F"},
-                    {"name": "Gary Sinise", "age": 70, "gender": "M"},
-                    {"name": "Sally Field", "age": 78, "gender": "F"},
-                ],
-                "genres": ["Drama", "Romance"],
-            },
-            {
-                "movie": {
-                    "title": "Inception",
-                    "description": "A thief who steals corporate secrets through the use of dream-sharing technology is given the inverse task of planting an idea into the mind of a C.E.O.",
-                    "release_year": 2010,
-                    "director": "Christopher Nolan",
-                    "duration": 148,
-                    "platform": "Warner Bros.",
-                    "rating": 3.7
-                },
-                "actors": [
-                    {"name": "Leonardo DiCaprio", "age": 50, "gender": "M"},
-                    {"name": "Joseph Gordon-Levitt", "age": 44, "gender": "M"},
-                    {
-                        "name": "Elliot Page",
-                        "age": 38,
-                        "gender": "M",
-                    },  # Elliot Page identifies as male
-                    {"name": "Tom Hardy", "age": 48, "gender": "M"},
-                    {"name": "Ken Watanabe", "age": 65, "gender": "M"},
-                ],
-                "genres": ["Action", "Adventure", "Science Fiction"],
-            },
-            {
-                "movie": {
-                    "title": "The Social Network",
-                    "description": "As Harvard students and friends Mark Zuckerberg and Eduardo Saverin create the social networking site that would become Facebook, they must deal with personal and legal complications.",
-                    "release_year": 2010,
-                    "director": "David Fincher",
-                    "duration": 120,
-                    "platform": "Columbia Pictures",
-                    "rating": 4.5
-                },
-                "actors": [
-                    {"name": "Jesse Eisenberg", "age": 40, "gender": "M"},
-                    {"name": "Andrew Garfield", "age": 40, "gender": "M"},
-                    {"name": "Justin Timberlake", "age": 42, "gender": "M"},
-                    {"name": "Rooney Mara", "age": 38, "gender": "F"},
-                ],
-                "genres": ["Biography", "Drama"],
-            },
-            {
-                "movie": {
-                    "title": "Star Wars",
-                    "description": "In a galaxy far, far away, a group of rebels band together to fight the evil Galactic Empire.",
-                    "release_year": 1977,
-                    "director": "George Lucas",
-                    "duration": 121,
-                    "platform": "20th Century Fox",
-                    "rating": 4.5
-                },
-                "actors": [
-                    {"name": "Mark Hamill", "age": 70, "gender": "M"},
-                    {"name": "Harrison Ford", "age": 81, "gender": "M"},
-                    {"name": "Carrie Fisher", "age": 60, "gender": "F"},
-                ],
-                "genres": ["Action", "Adventure", "Fantasy"],
-            },
-            {
-                "movie": {
-                    "title": "The Matrix",
-                    "description": "A computer hacker learns from mysterious rebels about the true nature of his reality and his role in the war against its controllers.",
-                    "release_year": 1999,
-                    "director": "Wachowskis",
-                    "duration": 136,
-                    "platform": "Warner Bros.",
-                    "rating": 1.7
-                },
-                "actors": [
-                    {"name": "Keanu Reeves", "age": 61, "gender": "M"},
-                    {"name": "Laurence Fishburne", "age": 64, "gender": "M"},
-                    {"name": "Carrie-Anne Moss", "age": 58, "gender": "F"},
-                    {"name": "Hugo Weaving", "age": 65, "gender": "M"},
-                ],
-                "genres": ["Action", "Science Fiction"],
-            },
-        ]
+    if instance:
+        return instance
+    else:
+        instance_data = {**kwargs, **defaults}
+        instance = model(**instance_data)
+        session.add(instance)
+        return instance
 
-        all_genre_names = set(
-            genre for item in movies_with_details for genre in item["genres"]
+
+# --- 2. Lógica de procesamiento adaptada para un diccionario ---
+def process_movie_data(session: Session, movie_data: dict):
+    """
+    Valida y procesa los datos de una película, realizando un único commit al final.
+    """
+    try:
+        pydantic_movie = PydanticMovie.model_validate(movie_data)
+    except Exception as e:
+        movie_title = movie_data.get("titulo", "Desconocido")
+        print(f"Error validando la película '{movie_title}': {e}")
+        return
+
+    if session.get(DBMovie, pydantic_movie.id):
+        print(
+            f"La película '{pydantic_movie.titulo}' (ID: {pydantic_movie.id}) ya existe. Saltando."
         )
-        genre_map = {name: Genre(name=name) for name in all_genre_names}
-        session.add_all(genre_map.values())
-        session.commit()
+        return
 
-        all_actors_data = {}
-        for item in movies_with_details:
-            for actor_data in item["actors"]:
-                if actor_data["name"] not in all_actors_data:
-                    all_actors_data[actor_data["name"]] = actor_data
-
-        actor_map = {name: Actor(**data) for name, data in all_actors_data.items()}
-        session.add_all(actor_map.values())
-        session.commit()
+    print(f"Procesando película: '{pydantic_movie.titulo}'")
 
 
-        for item in movies_with_details:
-            movie_genres = [genre_map[genre_name] for genre_name in item["genres"]]
-            movie_cast = [
-                actor_map[actor_data["name"]] for actor_data in item["actors"]
-            ]
 
-            movie = Movie(**item["movie"], genres=movie_genres, cast=movie_cast)
-            session.add(movie)
-            session.commit()
-            session.refresh(movie)
-            print(movie_genres)
-            if item["movie"]["title"] in ["The Dark Knight","Pulp Fiction"]:
+    db_director = None
+    if pydantic_movie.director:
+        director_data = pydantic_movie.director.model_dump()
+        db_director = get_or_create(
+            session, RealPerson, id=director_data["id"], defaults=director_data
+        )
 
-                review = Review(
-                    movie_id=movie.id,
-                    user_id=1,
-                    rating=5,
-                )
-                session.add(review)
 
-        session.commit()
-        print("Datos iniciales realistas y precisos han sido añadidos exitosamente.")
+    db_genres = [
+        get_or_create(session, Genre, id=g.id, defaults=g.model_dump())
+        for g in pydantic_movie.generos
+    ]
+
+
+    db_platforms = [
+        get_or_create(session, Platform, id=p.id, defaults=p.model_dump())
+        for p in pydantic_movie.plataformas
+    ]
+
+
+    db_movie = DBMovie(
+        id=pydantic_movie.id,
+        titulo=pydantic_movie.titulo,
+        sinopsis=pydantic_movie.sinopsis,
+        duracionMinutos=pydantic_movie.duracionMinutos,
+        fechaEstreno=pydantic_movie.fechaEstreno if pydantic_movie.fechaEstreno else None,
+        posterUrl=pydantic_movie.posterUrl if pydantic_movie.posterUrl else None,
+        director_id=db_director.id if db_director else None,
+        generos=db_genres,
+        plataformas=db_platforms,
+    )
+    session.add(db_movie)
+
+
+    for cast_member in pydantic_movie.elenco:
+        person_data = cast_member.actor.model_dump()
+        db_person = get_or_create(
+            session, RealPerson, id=person_data["id"], defaults=person_data
+        )
+
+        existing_link = session.exec(
+            select(CastLink).filter_by(movie_id=db_movie.id, person_id=db_person.id)
+        ).first()
+        if not existing_link:
+            cast_link = CastLink(
+                movie_id=db_movie.id,
+                person_id=db_person.id,
+                personaje=cast_member.personaje,
+                orden=cast_member.orden,
+            )
+            session.add(cast_link)
+
+    session.commit()
+
+    print(f"Película '{db_movie.titulo}' añadida exitosamente.")
+
+# --- 3. Función principal que lee el archivo JSON ---
+def seed_initial_data():
+
+
+    ROOT_DIR = Path(__file__).resolve().parent.parent.parent
+    JSON_FILE_PATH = ROOT_DIR / "peliculas.json"
+    print(JSON_FILE_PATH)
+    print(ROOT_DIR)
+
+    if not JSON_FILE_PATH.exists():
+        print(f"Error: El archivo {JSON_FILE_PATH} no fue encontrado.")
+        return
+
+    print(f"Leyendo datos desde {JSON_FILE_PATH}...")
+    with open(JSON_FILE_PATH, "r", encoding="utf-8") as file:
+        movies_list = json.load(file)
+
+    with Session(engine) as session:
+        for movie_data in movies_list:
+            process_movie_data(session, movie_data)
+
+    print("Proceso de seeding completado.")
+
+if __name__ == "__main__":
+    create_db_and_tables()
+    seed_initial_data()
