@@ -1,6 +1,7 @@
 import strawberry
 from typing import List, Optional
 from sqlmodel import Session, select
+from sqlalchemy import func
 from sqlalchemy.orm import selectinload
 from datetime import date
 
@@ -9,8 +10,9 @@ from app.db.config import get_session
 from app.models import (
     Movie as DBMovie,
     RealPerson as DBRealPerson,
-
+    Platform as DBPlatform,  # noqa: F401
     CastLink as DBCastLink,
+    Genre as DBGenre,
 )
 
 
@@ -73,7 +75,7 @@ class MovieType:
 
     # Relaciones actualizadas
     @strawberry.field
-    def director(self) -> RealPersonType:
+    def director(self) -> Optional[RealPersonType]:
         """El director de la película."""
         return self.director  # type: ignore
 
@@ -93,7 +95,6 @@ class MovieType:
         return self.cast_links  # type: ignore
 
 
-# --- 3. Query Actualizada y Optimizada ⚙️ ---
 
 
 @strawberry.type
@@ -109,13 +110,12 @@ class Query:
             selectinload(DBMovie.director),
             selectinload(DBMovie.generos),
             selectinload(DBMovie.plataformas),
-            # Carga anidada: carga los enlaces del elenco Y la persona en cada enlace
             selectinload(DBMovie.cast_links).selectinload(DBCastLink.person),
         )
 
         if titulo:
             statement = statement.where(
-                DBMovie.titulo.icontains(titulo)
+                DBMovie.titulo.contains(titulo.lower())
             )
 
         results = db_session.exec(statement).unique().all()
@@ -124,7 +124,15 @@ class Query:
 
     @strawberry.field
     def plataformas(self) -> List[PlatformType]:
-        return self.plataformas # type: ignore
+        return self.plataformas  # type: ignore
+
+    @strawberry.field
+    def generos(self) -> List[GenreType]:
+        db_session: Session = next(get_session())
+        statement = select(DBGenre)
+        results = db_session.exec(statement).all()
+        db_session.close()
+        return results
 
     @strawberry.field
     def personas(self, nombre: Optional[str] = None) -> List[RealPersonType]:
@@ -133,7 +141,7 @@ class Query:
 
         statement = select(DBRealPerson)
         if nombre:
-            statement = statement.where(DBRealPerson.nombre.icontains(nombre))
+            statement = statement.where(DBRealPerson.nombre.contains(nombre.lower()))
 
         results = db_session.exec(statement).all()
         db_session.close()

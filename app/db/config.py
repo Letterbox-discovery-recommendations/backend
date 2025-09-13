@@ -98,6 +98,7 @@ def process_movie_data(session: Session, movie_data: dict):
         fechaEstreno=pydantic_movie.fechaEstreno if pydantic_movie.fechaEstreno else None,
         posterUrl=pydantic_movie.posterUrl if pydantic_movie.posterUrl else None,
         director_id=db_director.id if db_director else None,
+        activa= pydantic_movie.activa if pydantic_movie.activa else None,
         generos=db_genres,
         plataformas=db_platforms,
     )

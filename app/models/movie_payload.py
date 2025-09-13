@@ -35,6 +35,7 @@ class Movie(BaseModel):
     duracionMinutos : int
     fechaEstreno : date | None
     posterUrl : str | None
+    activa : bool
     director : RealPerson | None
     elenco : list[Cast]
     generos : list[Genre]

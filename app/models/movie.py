@@ -19,10 +19,10 @@ class Movie(SQLModel, table=True):
     fechaEstreno: date | None = None
     posterUrl: str | None = None
     director_id: int | None = Field(default=None, foreign_key="realperson.id")
-
+    activa : bool = Field(default=True)
     director: "RealPerson" = Relationship(back_populates="movies_directed")
 
-    cast_links: List["CastLink"] = Relationship(back_populates="movie")
+    cast_links: List["CastLink"] = Relationship(back_populates="movie", sa_relationship_kwargs={"cascade": "all, delete-orphan"})
 
     generos: List["Genre"] = Relationship(
         back_populates="movies", link_model=MovieGenreLink

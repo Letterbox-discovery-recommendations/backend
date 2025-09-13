@@ -53,7 +53,7 @@ def test_query_peliculas_filter():
     assert "errors" not in result
     assert "peliculas" in result["data"]
     for movie in result["data"]["peliculas"]:
-        assert "El Padrino" in movie["titulo"]
+        assert "El padrino".lower() in movie["titulo"]
 
 # Test: Query all persons (actors/directors)
 def test_query_personas():
@@ -111,6 +111,9 @@ def test_query_generos():
     for genero in result["data"]["generos"]:
         assert "id" in genero
         assert "nombre" in genero
+
+
+
 from fastapi.testclient import TestClient
 from app.main import app
 
@@ -233,6 +236,8 @@ def test_query_generos():
     for genero in result["data"]["generos"]:
         assert "id" in genero
         assert "nombre" in genero
+
+
 from fastapi.testclient import TestClient
 from app.main import app
 

@@ -1,4 +1,4 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 from app.models import Movie
 
 
@@ -6,5 +6,4 @@ class RecommendationResponse(BaseModel):
     movie: Movie
     score: float
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
