@@ -1,7 +1,8 @@
-from sqlmodel import Session, select
+from sqlmodel import Session, select, func
 import numpy as np
-from app.models import Movie, Review, Genre
+from app.models import Movie, Review, Genre, Platform
 from sklearn.metrics.pairwise import cosine_similarity
+from datetime import datetime, timedelta
 
 positive_rating_threshold = 4.0
 
@@ -72,3 +73,59 @@ class Recommendations:
 
         recommendations.sort(key=lambda x: x[1], reverse=True)
         return recommendations
+
+    def get_global_rankings(self, limit: int = 10):
+        """Top global: películas más recomendadas (ratings positivos) en el último mes."""
+        one_month_ago = datetime.utcnow() - timedelta(days=30)
+        query = (
+            select(Movie, func.count(Review.id).label("recommendation_count"))
+            .join(Review)
+            .where(Review.rating >= positive_rating_threshold, Review.created_at >= one_month_ago)
+            .group_by(Movie.id)
+            .order_by(func.count(Review.id).desc())
+            .limit(limit)
+        )
+        results = self.db_session.exec(query).all()
+        return [{"movie": movie, "score": count} for movie, count in results]
+
+    def get_viral_rankings(self, limit: int = 10):
+        """Top viral: tendencias de la última semana (más ratings recientes)."""
+        one_week_ago = datetime.utcnow() - timedelta(days=7)
+        query = (
+            select(Movie, func.count(Review.id).label("rating_count"))
+            .join(Review)
+            .where(Review.created_at >= one_week_ago)
+            .group_by(Movie.id)
+            .order_by(func.count(Review.id).desc())
+            .limit(limit)
+        )
+        results = self.db_session.exec(query).all()
+        return [{"movie": movie, "score": count} for movie, count in results]
+
+    def get_rankings_by_platform(self, platform_id: int, limit: int = 10):
+        """Top por plataforma: películas de una plataforma ordenadas por promedio de rating."""
+        query = (
+            select(Movie, func.avg(Review.rating).label("avg_rating"))
+            .join(Review)
+            .join(Movie.plataformas)  # Asumiendo la relación
+            .where(Platform.id == platform_id)
+            .group_by(Movie.id)
+            .order_by(func.avg(Review.rating).desc())
+            .limit(limit)
+        )
+        results = self.db_session.exec(query).all()
+        return [{"movie": movie, "score": avg} for movie, avg in results]
+
+    def get_rankings_by_genre(self, genre_id: int, limit: int = 10):
+        """Top por género: películas de un género ordenadas por promedio de rating."""
+        query = (
+            select(Movie, func.avg(Review.rating).label("avg_rating"))
+            .join(Review)
+            .join(Movie.generos)  # Asumiendo la relación
+            .where(Genre.id == genre_id)
+            .group_by(Movie.id)
+            .order_by(func.avg(Review.rating).desc())
+            .limit(limit)
+        )
+        results = self.db_session.exec(query).all()
+        return [{"movie": movie, "score": avg} for movie, avg in results]

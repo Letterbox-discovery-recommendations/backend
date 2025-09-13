@@ -4,6 +4,7 @@ from app.db.config import create_db_and_tables, seed_initial_data
 from app.routers import actores_router
 from fastapi.middleware.cors import CORSMiddleware
 from app.routers.recommendations import router as recommendations_router
+from app.routers import actores_router, recommendations_router, rankings_router
 from strawberry.fastapi import GraphQLRouter
 from app.graphql.schema import schema
 
@@ -25,6 +26,7 @@ app = FastAPI(lifespan=lifespan)
 
 app.include_router(actores_router)
 app.include_router(recommendations_router)
+app.include_router(rankings_router)
 app.include_router(graphql_app, prefix="/graphql")
 
 
