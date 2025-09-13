@@ -1,7 +1,6 @@
 import pytest
 from sqlmodel import SQLModel, Session, create_engine, select
-from app.models.actor import Actor
-from app.models.movie import Movie, MovieActorLink
+from app.models.movie import Movie
 from app.models.genre import Genre, MovieGenreLink
 
 

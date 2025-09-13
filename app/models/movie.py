@@ -1,32 +1,33 @@
 from typing import List, TYPE_CHECKING
 from sqlmodel import Field, SQLModel, Relationship
+from datetime import date
+
+
+from .links import CastLink, MovieGenreLink, MoviePlatformLink
 
 if TYPE_CHECKING:
-    from .actor import Actor
+    from .real_person import RealPerson
     from .genre import Genre
-
-
-class MovieActorLink(SQLModel, table=True):
-    movie_id: int | None = Field(default=None, foreign_key="movie.id", primary_key=True)
-    actor_id: int | None = Field(default=None, foreign_key="actor.id", primary_key=True)
-
-
-class MovieGenreLink(SQLModel, table=True):
-    movie_id: int | None = Field(default=None, foreign_key="movie.id", primary_key=True)
-    genre_id: int | None = Field(default=None, foreign_key="genre.id", primary_key=True)
+    from .platform import Platform
 
 
 class Movie(SQLModel, table=True):
     id: int | None = Field(default=None, primary_key=True)
-    title: str = Field(nullable=False)
-    description: str
-    release_year: int
-    director: str
-    duration: int
+    titulo: str = Field(index=True)
+    sinopsis: str
+    duracionMinutos: int
+    fechaEstreno: date | None = None
+    posterUrl: str | None = None
+    director_id: int | None = Field(default=None, foreign_key="realperson.id")
 
-    cast: List["Actor"] = Relationship(
-        back_populates="movies", link_model=MovieActorLink
-    )
-    genres: List["Genre"] = Relationship(
+    director: "RealPerson" = Relationship(back_populates="movies_directed")
+
+    cast_links: List["CastLink"] = Relationship(back_populates="movie")
+
+    generos: List["Genre"] = Relationship(
         back_populates="movies", link_model=MovieGenreLink
+    )
+
+    plataformas: List["Platform"] = Relationship(
+        back_populates="movies", link_model=MoviePlatformLink
     )
