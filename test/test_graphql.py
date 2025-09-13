@@ -4,178 +4,114 @@ from app.main import app
 client = TestClient(app)
 
 
-def test_query_movies():
-    """
-    Valida que la query movies devuelve una lista de películas con todos los atributos principales.
-    """
+# Test: Query all movies with all fields and relations
+def test_query_peliculas():
     query = """
     query {
-      movies {
+      peliculas {
         id
-        title
-        description
-        releaseYear
-        director
-        duration
-        cast { id name }
-        genres { id name }
+        titulo
+        sinopsis
+        duracionMinutos
+        fechaEstreno
+        posterUrl
+        director { id nombre }
+        elenco { personaje orden actor { id nombre } }
+        generos { id nombre }
+        plataformas { id nombre }
       }
     }
     """
     response = client.post("/graphql", json={"query": query})
     result = response.json()
     assert "errors" not in result
-    assert "movies" in result["data"]
-    for movie in result["data"]["movies"]:
+    assert "peliculas" in result["data"]
+    for movie in result["data"]["peliculas"]:
         assert "id" in movie
-        assert "title" in movie
-        assert "description" in movie
-        assert "releaseYear" in movie
-        assert "director" in movie
-        assert "duration" in movie
-        assert isinstance(movie["cast"], list)
-        assert isinstance(movie["genres"], list)
+        assert "titulo" in movie
+        assert "sinopsis" in movie
+        assert "duracionMinutos" in movie
+        assert "elenco" in movie
+        assert isinstance(movie["elenco"], list)
+        assert "generos" in movie
+        assert isinstance(movie["generos"], list)
+        assert "plataformas" in movie
+        assert isinstance(movie["plataformas"], list)
 
 
-def test_query_actors():
-    """
-    Valida que la query actors devuelve una lista de actores con todos los atributos principales.
-    """
+# Test: Filter movies by title
+def test_query_peliculas_filter():
     query = """
     query {
-      actors {
+      peliculas(titulo: "El Padrino") {
         id
-        name
-        age
-        gender
-        movies { id title }
+        titulo
       }
     }
     """
     response = client.post("/graphql", json={"query": query})
     result = response.json()
     assert "errors" not in result
-    assert "actors" in result["data"]
-    for actor in result["data"]["actors"]:
-        assert "id" in actor
-        assert "name" in actor
-        assert "age" in actor
-        assert "gender" in actor
-        assert isinstance(actor["movies"], list)
+    assert "peliculas" in result["data"]
+    for movie in result["data"]["peliculas"]:
+        assert "El padrino".lower() in movie["titulo"]
 
 
-def test_query_genres():
-    """
-    Valida que la query de géneros devuelve una lista de géneros con sus películas.
-    """
+# Test: Query all persons (actors/directors)
+def test_query_personas():
     query = """
     query {
-      actors { id } # dummy para evitar error si no hay query genres
+      personas {
+        id
+        nombre
+        genero
+        imagenUrl
+      }
     }
     """
     response = client.post("/graphql", json={"query": query})
     result = response.json()
     assert "errors" not in result
+    assert "personas" in result["data"]
+    for person in result["data"]["personas"]:
+        assert "id" in person
+        assert "nombre" in person
+        assert "genero" in person
+        assert "imagenUrl" in person
 
 
-def test_query_movies_filter():
-    """
-    Valida que la query movies con filtro por título funciona correctamente.
-    """
+# Test: Filter persons by name
+def test_query_personas_filter():
     query = """
     query {
-      movies(title: "The Godfather") {
+      personas(nombre: "Marlon Brando") {
         id
-        title
+        nombre
       }
     }
     """
     response = client.post("/graphql", json={"query": query})
     result = response.json()
     assert "errors" not in result
-    assert "movies" in result["data"]
-    for movie in result["data"]["movies"]:
-        assert "The Godfather" in movie["title"]
+    assert "personas" in result["data"]
+    for person in result["data"]["personas"]:
+        assert "Marlon Brando" in person["nombre"]
 
 
-def test_query_actors_filter():
-    """
-    Valida que la query actors con filtro por nombre funciona correctamente.
-    """
+# Test: Query all genres
+def test_query_generos():
     query = """
     query {
-      actors(name: "Marlon Brando") {
+      generos {
         id
-        name
+        nombre
       }
     }
     """
     response = client.post("/graphql", json={"query": query})
     result = response.json()
     assert "errors" not in result
-    assert "actors" in result["data"]
-    for actor in result["data"]["actors"]:
-        assert "Marlon Brando" in actor["name"]
-
-def test_query_movies_advanced_filters():
-    """
-    Valida que los filtros avanzados de la query movies funcionan correctamente.
-    """
-    query = '''
-    query {
-      movies(minRating: 4, maxRating: 5, platform: "Netflix", minYear: 2000, maxYear: 2025, genre: "Drama", minDuration: 90, maxDuration: 200, limit: 2, sort: "rating_desc") {
-        id
-        title
-        rating
-        platform
-        releaseYear
-      }
-    }
-    '''
-    response = client.post("/graphql", json={"query": query})
-    result = response.json()
-    assert "errors" not in result
-    assert "movies" in result["data"]
-    for movie in result["data"]["movies"]:
-        assert 4 <= movie["rating"] <= 5
-        assert movie["platform"] == "Netflix"
-        assert 2000 <= movie["releaseYear"] <= 2025
-
-
-def test_query_movies_invalid_filters():
-    """
-    Valida que la query movies devuelve error si los filtros son inválidos.
-    """
-    query = '''
-    query {
-      movies(minYear: 2025, maxYear: 2000) {
-        id
-      }
-    }
-    '''
-    response = client.post("/graphql", json={"query": query})
-    result = response.json()
-    assert "errors" in result
-
-
-def test_query_genres():
-    """
-    Valida que la query genres devuelve una lista de géneros con sus películas.
-    """
-    query = '''
-    query {
-      genres {
-        id
-        name
-        movies { id title }
-      }
-    }
-    '''
-    response = client.post("/graphql", json={"query": query})
-    result = response.json()
-    assert "errors" not in result
-    assert "genres" in result["data"]
-    for genre in result["data"]["genres"]:
-        assert "id" in genre
-        assert "name" in genre
-        assert isinstance(genre["movies"], list)
+    assert "generos" in result["data"]
+    for genero in result["data"]["generos"]:
+        assert "id" in genero
+        assert "nombre" in genero

@@ -1,6 +1,6 @@
 from typing import List, TYPE_CHECKING
 from sqlmodel import Field, SQLModel, Relationship
-from .movie import MovieGenreLink
+from .links import MovieGenreLink
 
 if TYPE_CHECKING:
     from .movie import Movie
@@ -8,9 +8,8 @@ if TYPE_CHECKING:
 
 class Genre(SQLModel, table=True):
     id: int | None = Field(default=None, primary_key=True)
-    name: str
-    description: str | None = Field(default=None)
+    nombre: str
 
     movies: List["Movie"] = Relationship(
-        back_populates="genres", link_model=MovieGenreLink
+        back_populates="generos", link_model=MovieGenreLink
     )

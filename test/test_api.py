@@ -1,5 +1,6 @@
 from fastapi.testclient import TestClient
 from app.main import app
+import pytest
 
 client = TestClient(app)
 
@@ -12,11 +13,11 @@ def test_get_actor_names():
     assert response.status_code == 200
     data = response.json()
     assert isinstance(data, list)
-    for actor in data:
-        assert "id" in actor
-        assert "name" in actor
-        assert isinstance(actor["id"], int)
-        assert isinstance(actor["name"], str)
+    for person in data:
+        assert "id" in person
+        assert "nombre" in person
+        assert isinstance(person["id"], int)
+        assert isinstance(person["nombre"], str)
 
 
 def test_get_actor_names_not_found():
@@ -51,21 +52,21 @@ def test_get_actor_names_not_found():
     assert response.json() == []
     app.dependency_overrides = {}
 
-import pytest
+
 def test_get_actor_names_invalid():
     """
     Valida que el endpoint responde con error si hay un fallo interno (simulado).
     """
     import app.routers.actores as actores_router
+
     def fake_get_session():
         raise Exception("DB error")
+
     from app.main import app
+
     app.dependency_overrides[actores_router.get_session] = fake_get_session
     client = TestClient(app)
     with pytest.raises(Exception) as excinfo:
         client.get("/api/v1/actores/nombres")
     assert "DB error" in str(excinfo.value)
     app.dependency_overrides = {}
-
-
-
