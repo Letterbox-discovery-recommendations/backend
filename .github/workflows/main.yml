@@ -2,6 +2,7 @@ name: CI Backend
 on:
   pull_request:
     branches: [ main ]
+  workflow_dispatch:
 
 jobs:
   build-python:
