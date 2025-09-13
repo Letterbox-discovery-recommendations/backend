@@ -1,6 +1,6 @@
 import os
-import json  # <--- 1. Importa el módulo json
-from pathlib import Path  # <--- 1. Importa Path para manejar rutas
+import json
+from pathlib import Path 
 from dotenv import load_dotenv
 from sqlmodel import create_engine, SQLModel, Session, select
 
