@@ -1,0 +1,57 @@
+name: Run Tests
+
+on:
+  pull_request:
+    branches: [ dev ]
+  workflow_dispatch:
+  push:
+    branches: [ integracion-deploy ]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: testdb
+        ports:
+          - 5432:5432
+
+    env:
+      DB_USER: postgres
+      DB_PASSWORD: postgres
+      DB_NAME: testdb
+      DB_HOST: localhost
+      DB_PORT: 5432
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.12'
+        
+    - name: Install uv
+      uses: astral-sh/setup-uv@v4
+      
+    - name: Install dependencies
+      run: uv sync --frozen
+
+    - name: Run migrations (or manually create tables)
+      run: |
+        uv run alembic upgrade head || echo "Alembic skipped"
+        uv run python -c "from app.db.config import create_db_and_tables; create_db_and_tables()"
+
+    - name: Seed database
+      run: uv run python -c "from app.db.config import seed_initial_data; seed_initial_data()"
+      
+    - name: Run tests
+      run: uv run pytest --maxfail=5 --tb=short
+      
+    - name: Check test coverage
+      run: uv run pytest --cov=app --cov-report=term-missing --cov-fail-under=85
