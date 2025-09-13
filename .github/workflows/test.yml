@@ -43,6 +43,9 @@ jobs:
 
     - name: Run migrations
       run: uv run alembic upgrade head
+
+    - name: Run proyect
+      run: uv run uvicorn app.main:app --reload
       
     - name: Run tests
       run: uv run pytest --maxfail=5 --tb=short
