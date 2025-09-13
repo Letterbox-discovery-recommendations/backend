@@ -1,7 +1,7 @@
 import strawberry
 from typing import List, Optional
 from sqlmodel import Session, select
-from sqlalchemy import func
+from sqlalchemy import func  # noqa: F401
 from sqlalchemy.orm import selectinload
 from datetime import date
 
@@ -16,11 +16,10 @@ from app.models import (
 )
 
 
-
-
 @strawberry.type
 class RealPersonType:
     """Representa a una persona (actor o director) en el sistema."""
+
     id: int
     nombre: str
     imagenUrl: Optional[str]
@@ -58,6 +57,7 @@ class CastLinkType:
 @strawberry.type
 class GenreType:
     """Representa un género de película."""
+
     id: int
     nombre: str  # name -> nombre
 
@@ -95,8 +95,6 @@ class MovieType:
         return self.cast_links  # type: ignore
 
 
-
-
 @strawberry.type
 class Query:
     @strawberry.field
@@ -114,9 +112,7 @@ class Query:
         )
 
         if titulo:
-            statement = statement.where(
-                DBMovie.titulo.contains(titulo.lower())
-            )
+            statement = statement.where(DBMovie.titulo.contains(titulo.lower()))
 
         results = db_session.exec(statement).unique().all()
         db_session.close()
@@ -165,6 +161,7 @@ class Query:
 
         result = db_session.exec(statement).first()
         db_session.close()
-        return result # type: ignore
+        return result  # type: ignore
+
 
 schema = strawberry.Schema(query=Query)

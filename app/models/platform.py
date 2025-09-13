@@ -6,6 +6,7 @@ from .links import MoviePlatformLink
 if TYPE_CHECKING:
     from .movie import Movie
 
+
 class Platform(SQLModel, table=True):
     id: int | None = Field(default=None, primary_key=True)
     nombre: str

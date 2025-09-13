@@ -2,7 +2,6 @@ from logging.config import fileConfig
 import os
 from dotenv import load_dotenv
 from sqlmodel import SQLModel
-from app.models import Movie,MovieGenreLink,Genre,Review,MoviePlatformLink,CastLink,RealPerson,PydanticMovie,Platform # noqa: F401
 from sqlalchemy import engine_from_config, pool
 from alembic import context
 

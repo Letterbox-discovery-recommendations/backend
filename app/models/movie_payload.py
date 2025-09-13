@@ -3,48 +3,50 @@ from datetime import date
 
 
 class RealPerson(BaseModel):
-    id : int
-    nombre : str
-    imagenUrl : str | None
-    genero : int
+    id: int
+    nombre: str
+    imagenUrl: str | None
+    genero: int
+
 
 class Actor(BaseModel):
-    id : int
-    actor : RealPerson
+    id: int
+    actor: RealPerson
+
 
 class Genre(BaseModel):
-    id : int
-    nombre : str
+    id: int
+    nombre: str
+
 
 class Cast(BaseModel):
-    id : int
-    actor : RealPerson
-    personaje : str
-    orden : int
+    id: int
+    actor: RealPerson
+    personaje: str
+    orden: int
+
 
 class Platform(BaseModel):
-    id : int
-    nombre : str
-    logoUrl : str | None
+    id: int
+    nombre: str
+    logoUrl: str | None
 
 
 class Movie(BaseModel):
-    id : int
-    titulo : str
-    sinopsis : str
-    duracionMinutos : int
-    fechaEstreno : date | None
-    posterUrl : str | None
-    activa : bool
-    director : RealPerson | None
-    elenco : list[Cast]
-    generos : list[Genre]
-    plataformas : list[Platform]
-
+    id: int
+    titulo: str
+    sinopsis: str
+    duracionMinutos: int
+    fechaEstreno: date | None
+    posterUrl: str | None
+    activa: bool
+    director: RealPerson | None
+    elenco: list[Cast]
+    generos: list[Genre]
+    plataformas: list[Platform]
 
 
 if __name__ == "__main__":
-
     example = """{
         "id": 1,
         "titulo": "Expediente Warren: Obligado por el demonio",
@@ -442,4 +444,3 @@ if __name__ == "__main__":
     }"""
     movie = Movie.model_validate_json(example)
     print(movie.id)
-

@@ -1,9 +1,8 @@
 import os
 import json
-from pathlib import Path 
+from pathlib import Path
 from dotenv import load_dotenv
 from sqlmodel import create_engine, SQLModel, Session, select
-
 
 
 from app.models import (
@@ -12,13 +11,14 @@ from app.models import (
     Genre,
     Platform,
     CastLink,
-    PydanticMovie
+    PydanticMovie,
 )
 
 
 load_dotenv()
 DATABASE_URL = f"postgresql://{os.getenv('DB_USER')}:{os.getenv('DB_PASSWORD')}@{os.getenv('DB_HOST')}/{os.getenv('DB_NAME')}"
 engine = create_engine(DATABASE_URL)
+
 
 def get_session():
     with Session(engine) as session:
@@ -68,8 +68,6 @@ def process_movie_data(session: Session, movie_data: dict):
 
     print(f"Procesando película: '{pydantic_movie.titulo}'")
 
-
-
     db_director = None
     if pydantic_movie.director:
         director_data = pydantic_movie.director.model_dump()
@@ -77,33 +75,31 @@ def process_movie_data(session: Session, movie_data: dict):
             session, RealPerson, id=director_data["id"], defaults=director_data
         )
 
-
     db_genres = [
         get_or_create(session, Genre, id=g.id, defaults=g.model_dump())
         for g in pydantic_movie.generos
     ]
-
 
     db_platforms = [
         get_or_create(session, Platform, id=p.id, defaults=p.model_dump())
         for p in pydantic_movie.plataformas
     ]
 
-
     db_movie = DBMovie(
         id=pydantic_movie.id,
         titulo=pydantic_movie.titulo,
         sinopsis=pydantic_movie.sinopsis,
         duracionMinutos=pydantic_movie.duracionMinutos,
-        fechaEstreno=pydantic_movie.fechaEstreno if pydantic_movie.fechaEstreno else None,
+        fechaEstreno=pydantic_movie.fechaEstreno
+        if pydantic_movie.fechaEstreno
+        else None,
         posterUrl=pydantic_movie.posterUrl if pydantic_movie.posterUrl else None,
         director_id=db_director.id if db_director else None,
-        activa= pydantic_movie.activa if pydantic_movie.activa else None,
+        activa=pydantic_movie.activa if pydantic_movie.activa else None,
         generos=db_genres,
         plataformas=db_platforms,
     )
     session.add(db_movie)
-
 
     for cast_member in pydantic_movie.elenco:
         person_data = cast_member.actor.model_dump()
@@ -127,10 +123,9 @@ def process_movie_data(session: Session, movie_data: dict):
 
     print(f"Película '{db_movie.titulo}' añadida exitosamente.")
 
+
 # --- 3. Función principal que lee el archivo JSON ---
 def seed_initial_data():
-
-
     ROOT_DIR = Path(__file__).resolve().parent.parent.parent
     JSON_FILE_PATH = ROOT_DIR / "peliculas.json"
     print(JSON_FILE_PATH)
@@ -149,6 +144,7 @@ def seed_initial_data():
             process_movie_data(session, movie_data)
 
     print("Proceso de seeding completado.")
+
 
 if __name__ == "__main__":
     create_db_and_tables()
