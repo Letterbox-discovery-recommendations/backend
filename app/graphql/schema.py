@@ -13,6 +13,8 @@ from app.models import (
     Platform as DBPlatform,  # noqa: F401
     CastLink as DBCastLink,
     Genre as DBGenre,
+    MovieGenreLink,
+    MoviePlatformLink,
 )
 
 
