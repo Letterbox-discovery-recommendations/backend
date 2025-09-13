@@ -149,6 +149,9 @@ class Recommendations:
         df = pd.DataFrame([(r.user_id, r.movie_id, r.rating) for r in all_reviews],
                           columns=['user_id', 'movie_id', 'rating'])
 
+        # Agregar ratings duplicados tomando el promedio
+        df = df.groupby(['user_id', 'movie_id']).mean().reset_index()
+
         # Pivot para matriz usuario-película
         user_movie_matrix = df.pivot(index='user_id', columns='movie_id', values='rating').fillna(0)
 
