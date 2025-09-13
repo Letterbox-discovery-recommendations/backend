@@ -8,9 +8,9 @@ positive_rating_threshold = 4.0
 
 def vectorize_movie_genres(movie: Movie, genre_map: dict) -> np.ndarray:
     vector = np.zeros(len(genre_map))
-    for genre in movie.genres:
-        if genre.name in genre_map:
-            index = genre_map[genre.name]
+    for genre in movie.generos:
+        if genre.nombre in genre_map:
+            index = genre_map[genre.nombre]
             vector[index] = 1
     return vector
 
@@ -31,7 +31,7 @@ class Recommendations:
 
     def get_movie_vectors(self, all_movies):
         all_genre_names = sorted(
-            [genre.name for genre in self.db_session.exec(select(Genre)).all()]
+            [genre.nombre for genre in self.db_session.exec(select(Genre)).all()]
         )
         genre_to_index = {name: i for i, name in enumerate(all_genre_names)}
 
