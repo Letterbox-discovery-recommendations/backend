@@ -11,10 +11,11 @@ COPY --from=ghcr.io/astral-sh/uv:latest /uv /bin/uv
 COPY pyproject.toml uv.lock ./
 RUN uv sync --frozen
 
-COPY app ./
-COPY alembic.ini alembic ./
+COPY . .
+RUN uv build && uv pip install dist/*.whl --no-cache-dir
+
 COPY --from=public.ecr.aws/awsguru/aws-lambda-adapter:0.9.1 /lambda-adapter /opt/extensions/lambda-adapter
 
-EXPOSE 8080
+EXPOSE 8000
 
 CMD ["uv", "run", "uvicorn", "app.main:app", "--reload"]
