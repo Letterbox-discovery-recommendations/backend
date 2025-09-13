@@ -43,8 +43,8 @@ jobs:
     - name: Run migrations
       run: uv run alembic upgrade head
 
-    - name: Run proyect
-      run: uv run uvicorn app.main:app --reload
+    - name: Seed database
+      run: uv run python -c "from app.db.config import seed_initial_data; seed_initial_data()"
       
     - name: Run tests
       run: uv run pytest --maxfail=5 --tb=short
