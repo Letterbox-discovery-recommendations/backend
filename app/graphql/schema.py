@@ -98,7 +98,16 @@ class MovieType:
 @strawberry.type
 class Query:
     @strawberry.field
-    def peliculas(self, titulo: Optional[str] = None) -> List[MovieType]:
+    def peliculas(
+        self,
+        titulo: Optional[str] = None,
+        generos: Optional[List[str]] = None,
+        plataformas: Optional[List[str]] = None,
+        minDuration: Optional[int] = 0,
+        maxDuration: Optional[int] = 0,
+        minYear: Optional[int] = 0,
+        maxYear: Optional[int] = 0,
+    ) -> List[MovieType]:
         """Obtiene una lista de películas, opcionalmente filtrada por título."""
         db_session: Session = next(get_session())
 
@@ -112,7 +121,26 @@ class Query:
         )
 
         if titulo:
-            statement = statement.where(DBMovie.titulo.contains(titulo.lower()))
+            statement = statement.where(func.lower(DBMovie.titulo).contains(titulo.lower()))
+
+        if generos:
+            generos_lower = [g.lower() for g in generos]
+            statement = statement.where(
+                DBMovie.generos.any(func.lower(DBGenre.nombre).in_(generos_lower))
+            )
+        if plataformas:
+            plataformas_lower = [p.lower() for p in plataformas]
+            statement = statement.where(
+                DBMovie.plataformas.any(func.lower(DBPlatform.nombre).in_(plataformas_lower))
+            )
+        if minDuration:
+            statement = statement.where(DBMovie.duracionMinutos >= minDuration)
+        if maxDuration:
+            statement = statement.where(DBMovie.duracionMinutos <= maxDuration)
+        if minYear:
+            statement = statement.where(DBMovie.fechaEstreno.year >= minYear)
+        if maxYear:
+            statement = statement.where(DBMovie.fechaEstreno.year <= maxYear)
 
         results = db_session.exec(statement).unique().all()
         db_session.close()
@@ -120,7 +148,11 @@ class Query:
 
     @strawberry.field
     def plataformas(self) -> List[PlatformType]:
-        return self.plataformas  # type: ignore
+        db_session: Session = next(get_session())
+        statement = select(DBPlatform)
+        results = db_session.exec(statement).all()
+        db_session.close()
+        return results  # type: ignore
 
     @strawberry.field
     def generos(self) -> List[GenreType]:

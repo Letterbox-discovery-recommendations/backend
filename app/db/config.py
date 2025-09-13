@@ -12,6 +12,7 @@ from app.models import (
     Platform,
     CastLink,
     PydanticMovie,
+    Director
 )
 
 
@@ -72,7 +73,7 @@ def process_movie_data(session: Session, movie_data: dict):
     if pydantic_movie.director:
         director_data = pydantic_movie.director.model_dump()
         db_director = get_or_create(
-            session, RealPerson, id=director_data["id"], defaults=director_data
+            session, Director, id=director_data["id"], defaults=director_data
         )
 
     db_genres = [
