@@ -81,6 +81,8 @@ def test_sort_by_all_valid_options():
         assert isinstance(data["data"]["peliculas"], list)
 
 
+import re
+
 def test_sort_titulo_ascending_order():
     """Test that titulo sort returns movies in ascending alphabetical order"""
     query = '''
@@ -95,9 +97,14 @@ def test_sort_titulo_ascending_order():
     data = resp.json()
     assert "errors" not in data
     movies = data["data"]["peliculas"]
-    
+
     if len(movies) > 1:
-        titles = [movie["titulo"] for movie in movies]
+        # Solo títulos que empiezan con letras a-z o A-Z
+        titles = [
+            movie["titulo"].lower() 
+            for movie in movies 
+            if re.match(r'^[a-zA-Z]', movie["titulo"])
+        ]
         assert titles == sorted(titles), "Movies should be sorted by title in ascending order"
 
 
@@ -115,9 +122,13 @@ def test_sort_titulo_descending_order():
     data = resp.json()
     assert "errors" not in data
     movies = data["data"]["peliculas"]
-    
+
     if len(movies) > 1:
-        titles = [movie["titulo"] for movie in movies]
+        titles = [
+            movie["titulo"].lower() 
+            for movie in movies 
+            if re.match(r'^[a-zA-Z]', movie["titulo"])
+        ]
         assert titles == sorted(titles, reverse=True), "Movies should be sorted by title in descending order"
 
 

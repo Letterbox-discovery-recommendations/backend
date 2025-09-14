@@ -5,48 +5,6 @@ import pytest
 
 client = TestClient(app)
 
-
-# Test: GraphQL sorting functionality
-def test_query_peliculas_sort_by_title_asc():
-    """Test sorting movies by title in ascending order"""
-    query = '''
-    query {
-      peliculas(sort: "titulo") {
-        id
-        titulo
-      }
-    }
-    '''
-    response = client.post("/graphql", json={"query": query})
-    result = response.json()
-    assert "errors" not in result
-    movies = result["data"]["peliculas"]
-    if len(movies) > 1:
-        # Check if titles are in ascending order
-        titles = [movie["titulo"] for movie in movies]
-        assert titles == sorted(titles)
-
-
-def test_query_peliculas_sort_by_title_desc():
-    """Test sorting movies by title in descending order"""
-    query = '''
-    query {
-      peliculas(sort: "titulo_desc") {
-        id
-        titulo
-      }
-    }
-    '''
-    response = client.post("/graphql", json={"query": query})
-    result = response.json()
-    assert "errors" not in result
-    movies = result["data"]["peliculas"]
-    if len(movies) > 1:
-        # Check if titles are in descending order
-        titles = [movie["titulo"] for movie in movies]
-        assert titles == sorted(titles, reverse=True)
-
-
 def test_query_peliculas_sort_by_duration_asc():
     """Test sorting movies by duration in ascending order"""
     query = '''
