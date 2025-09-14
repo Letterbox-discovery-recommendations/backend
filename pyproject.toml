@@ -2,7 +2,7 @@
 name = "discovery-recommendations"
 version = "0.1.0"
 description = "Modulo de busqueda y recomendaciones"
-readme = "README.md"
+# readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
     "alembic>=1.16.5",
