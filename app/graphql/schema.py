@@ -13,6 +13,7 @@ from app.models import (
     Platform as DBPlatform,  # noqa: F401
     CastLink as DBCastLink,
     Genre as DBGenre,
+    Review as DBReview,  
     MovieGenreLink,
     MoviePlatformLink,
 )
@@ -80,6 +81,16 @@ class MovieType:
     def director(self) -> Optional[RealPersonType]:
         """El director de la película."""
         return self.director  # type: ignore
+    
+    @strawberry.field
+    def ratingPelicula(self) -> Optional[float]:
+        """El rating promedio de la película basado en reseñas."""
+        db_session: Session = next(get_session())
+        avg_rating = db_session.exec(
+            select(func.avg(DBReview.rating)).where(DBReview.movie_id == self.id)
+        ).first()
+        db_session.close()
+        return avg_rating if avg_rating is not None else None  # Devuelve None si no hay reseñas
 
     @strawberry.field
     def generos(self) -> List[GenreType]:
@@ -105,6 +116,7 @@ class Query:
         titulo: Optional[str] = None,
         generos: Optional[List[str]] = None,
         plataformas: Optional[List[str]] = None,
+        sort : Optional[str] = None,
         minDuration: Optional[int] = 0,
         maxDuration: Optional[int] = 0,
         minYear: Optional[int] = 0,
@@ -140,9 +152,27 @@ class Query:
         if maxDuration:
             statement = statement.where(DBMovie.duracionMinutos <= maxDuration)
         if minYear:
-            statement = statement.where(DBMovie.fechaEstreno.year >= minYear)
+            statement = statement.where(func.extract('year', DBMovie.fechaEstreno) >= minYear)
         if maxYear:
-            statement = statement.where(DBMovie.fechaEstreno.year <= maxYear)
+            statement = statement.where(func.extract('year', DBMovie.fechaEstreno) <= maxYear)
+        allowed_sorts = ["titulo", "titulo_desc", "duracionMinutos", "duracionMinutos_desc", "fechaEstreno", "fechaEstreno_desc"]
+        if sort and sort not in allowed_sorts:
+            sort = "titulo"  # Valor por defecto
+
+        if sort == "titulo":
+            statement = statement.order_by(DBMovie.titulo.asc())
+        elif sort == "titulo_desc":
+            statement = statement.order_by(DBMovie.titulo.desc())
+        elif sort == "duracionMinutos":
+            statement = statement.order_by(DBMovie.duracionMinutos.asc())
+        elif sort == "duracionMinutos_desc":
+            statement = statement.order_by(DBMovie.duracionMinutos.desc())
+        elif sort == "fechaEstreno":
+            statement = statement.order_by(DBMovie.fechaEstreno.asc())
+        elif sort == "fechaEstreno_desc":
+            statement = statement.order_by(DBMovie.fechaEstreno.desc())
+        else:
+            statement = statement.order_by(DBMovie.id.asc())  # Por defecto
 
         results = db_session.exec(statement).unique().all()
         db_session.close()
