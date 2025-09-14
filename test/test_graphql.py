@@ -115,3 +115,105 @@ def test_query_generos():
     for genero in result["data"]["generos"]:
         assert "id" in genero
         assert "nombre" in genero
+
+
+# Test: Filtrar película por plataforma
+def test_query_peliculas_filter_plataforma():
+    query = '''
+    query {
+      peliculas(plataformas: ["Netflix"]) {
+        id
+        titulo
+        plataformas { nombre }
+      }
+    }
+    '''
+    response = client.post("/graphql", json={"query": query})
+    result = response.json()
+    assert "errors" not in result
+    for movie in result["data"]["peliculas"]:
+        assert any(p["nombre"].lower() == "netflix" for p in movie["plataformas"])
+
+
+# Test: Filtrar película por año de estreno
+def test_query_peliculas_filter_year():
+    query = '''
+    query {
+      peliculas(minYear: 2020, maxYear: 2025) {
+        id
+        titulo
+        fechaEstreno
+      }
+    }
+    '''
+    response = client.post("/graphql", json={"query": query})
+    result = response.json()
+    assert "errors" not in result
+    for movie in result["data"]["peliculas"]:
+        if movie["fechaEstreno"]:
+            year = int(movie["fechaEstreno"].split("-")[0])
+            assert 2020 <= year <= 2025
+
+
+# Test: Filtrar película por duración
+def test_query_peliculas_filter_duracion():
+    query = '''
+    query {
+      peliculas(minDuration: 90, maxDuration: 120) {
+        id
+        titulo
+        duracionMinutos
+      }
+    }
+    '''
+    response = client.post("/graphql", json={"query": query})
+    result = response.json()
+    assert "errors" not in result
+    for movie in result["data"]["peliculas"]:
+        dur = movie["duracionMinutos"]
+        assert 90 <= dur <= 120
+
+
+# Test: Error - plataforma no existe
+def test_query_peliculas_filter_plataforma_invalida():
+    query = '''
+    query {
+      peliculas(plataformas: ["NoExiste"]) {
+        id
+      }
+    }
+    '''
+    response = client.post("/graphql", json={"query": query})
+    result = response.json()
+    assert "errors" not in result
+    assert result["data"]["peliculas"] == []
+
+
+# Test: Error - año fuera de rango
+def test_query_peliculas_filter_year_out_of_range():
+    query = '''
+    query {
+      peliculas(minYear: 1700, maxYear: 1750) {
+        id
+      }
+    }
+    '''
+    response = client.post("/graphql", json={"query": query})
+    result = response.json()
+    assert "errors" not in result
+    assert result["data"]["peliculas"] == []
+
+
+# Test: Error - duración fuera de rango
+def test_query_peliculas_filter_duracion_out_of_range():
+    query = '''
+    query {
+      peliculas(minDuration: 1, maxDuration: 5) {
+        id
+      }
+    }
+    '''
+    response = client.post("/graphql", json={"query": query})
+    result = response.json()
+    assert "errors" not in result
+    assert result["data"]["peliculas"] == []
