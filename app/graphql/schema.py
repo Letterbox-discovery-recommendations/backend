@@ -152,9 +152,9 @@ class Query:
         if maxDuration:
             statement = statement.where(DBMovie.duracionMinutos <= maxDuration)
         if minYear:
-            statement = statement.where(DBMovie.fechaEstreno.year >= minYear)
+            statement = statement.where(func.extract('year', DBMovie.fechaEstreno) >= minYear)
         if maxYear:
-            statement = statement.where(DBMovie.fechaEstreno.year <= maxYear)
+            statement = statement.where(func.extract('year', DBMovie.fechaEstreno) <= maxYear)
         allowed_sorts = ["titulo", "titulo_desc", "duracionMinutos", "duracionMinutos_desc", "fechaEstreno", "fechaEstreno_desc"]
         if sort and sort not in allowed_sorts:
             sort = "titulo"  # Valor por defecto
