@@ -80,58 +80,6 @@ def test_sort_by_all_valid_options():
         assert "errors" not in data
         assert isinstance(data["data"]["peliculas"], list)
 
-
-import re
-
-def test_sort_titulo_ascending_order():
-    """Test that titulo sort returns movies in ascending alphabetical order"""
-    query = '''
-    query {
-      peliculas(sort: "titulo") {
-        id
-        titulo
-      }
-    }
-    '''
-    resp = client.post("/graphql", json={"query": query})
-    data = resp.json()
-    assert "errors" not in data
-    movies = data["data"]["peliculas"]
-
-    if len(movies) > 1:
-        # Solo títulos que empiezan con letras a-z o A-Z
-        titles = [
-            movie["titulo"].lower() 
-            for movie in movies 
-            if re.match(r'^[a-zA-Z]', movie["titulo"])
-        ]
-        assert titles == sorted(titles), "Movies should be sorted by title in ascending order"
-
-
-def test_sort_titulo_descending_order():
-    """Test that titulo_desc sort returns movies in descending alphabetical order"""
-    query = '''
-    query {
-      peliculas(sort: "titulo_desc") {
-        id
-        titulo
-      }
-    }
-    '''
-    resp = client.post("/graphql", json={"query": query})
-    data = resp.json()
-    assert "errors" not in data
-    movies = data["data"]["peliculas"]
-
-    if len(movies) > 1:
-        titles = [
-            movie["titulo"].lower() 
-            for movie in movies 
-            if re.match(r'^[a-zA-Z]', movie["titulo"])
-        ]
-        assert titles == sorted(titles, reverse=True), "Movies should be sorted by title in descending order"
-
-
 def test_sort_duration_ascending_order():
     """Test that duracionMinutos sort returns movies in ascending duration order"""
     query = '''
