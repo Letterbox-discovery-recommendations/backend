@@ -7,6 +7,7 @@ from app.routers.recommendations import router as recommendations_router
 from app.routers import actores_router, recommendations_router, rankings_router
 from strawberry.fastapi import GraphQLRouter
 from app.graphql.schema import schema
+import os
 
 # Crea el router de GraphQL
 
@@ -33,6 +34,7 @@ app.include_router(graphql_app, prefix="/graphql")
 origins = [
     "http://localhost:5173",
     "http://localhost:3000",
+    os.getenv("FE_URL",""),
 ]
 
 app.add_middleware(

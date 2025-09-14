@@ -54,7 +54,7 @@ def test_query_peliculas_filter():
     assert "errors" not in result
     assert "peliculas" in result["data"]
     for movie in result["data"]["peliculas"]:
-        assert "El padrino".lower() in movie["titulo"]
+        assert "El padrino".lower() in movie["titulo"].lower()
 
 
 # Test: Query all persons (actors/directors)
