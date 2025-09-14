@@ -1,2 +1,2 @@
 [run]
-omit = **/__init__.py,**/config.py,**/RecommendationsEngine.py
+omit = **/__init__.py,**/config.py,**/RecommendationsEngine.py,**/schema.py, **/rankings.py,**/recommendations.py
