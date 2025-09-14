@@ -1,3 +1,4 @@
+from random import random
 from sqlmodel import Session, select, func
 import numpy as np
 import pandas as pd
@@ -155,7 +156,7 @@ class Recommendations:
         # Pivot para matriz usuario-película
         user_movie_matrix = df.pivot(index='user_id', columns='movie_id', values='rating').fillna(0)
 
-        # Obtener películas que el usuario ya ha visto
+        # Obtener películas que el usuario ya ha dado rating
         user_ratings = user_movie_matrix.loc[user_id] if user_id in user_movie_matrix.index else pd.Series()
         seen_movies = user_ratings[user_ratings > 0].index.tolist()
 
