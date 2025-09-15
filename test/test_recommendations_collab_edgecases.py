@@ -39,7 +39,7 @@ def test_get_recommendations_handles_movies_with_no_genres(memory_session):
     m1, m2, user = setup_minimal_db(memory_session)
     engine = Recommendations(memory_session)
     # debe recomendar m2 sólo si similitud > 0 (pero m2 tiene vector 0 -> no se recomienda)
-    recs = engine.get_recommendations()
+    recs = engine.get_recommendations(1)
     # como m2 no tiene géneros, no debería aparecer en recomendaciones
     assert all(movie.id != m2.id for movie, score in recs)
 

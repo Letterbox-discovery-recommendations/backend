@@ -8,7 +8,8 @@ client = TestClient(app)
 
 # Test: GET /api/v1/recommendations/ (global recommendations)
 def test_get_global_recommendations():
-    response = client.get("/api/v1/recommendations/")
+    user_id = 1
+    response = client.get(f"/api/v1/recommendations/content/{user_id}")
     assert response.status_code == 200
     data = response.json()
     assert isinstance(data, list)
@@ -35,12 +36,18 @@ def test_get_collaborative_recommendations_usuario_no_existe():
 
 # Test: GET /api/v1/recommendations/ (sin recomendaciones)
 def test_get_global_recommendations_sin_datos():
-    with patch("app.routers.recommendations.Recommendations.get_recommendations", return_value=[]):
-        response = client.get("/api/v1/recommendations/")
+    with patch(
+        "app.routers.recommendations.Recommendations.get_recommendations",
+        return_value=[],
+    ):
+        user_id = 1
+        response = client.get(f"/api/v1/recommendations/content/{user_id}")
         assert response.status_code == 200
         assert response.json() == []
 
 # Test: Edge case - método no permitido
 def test_post_not_allowed():
-    response = client.post("/api/v1/recommendations/")
+    user_id = 1
+
+    response = client.post(f"/api/v1/recommendations/content/{user_id}")
     assert response.status_code == 405

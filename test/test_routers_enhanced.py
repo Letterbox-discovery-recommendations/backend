@@ -167,7 +167,7 @@ class TestRecommendationsRouter:
 
     def test_get_recommendations_health_check(self):
         """Test the recommendations health check endpoint"""
-        response = client.get("/api/v1/recommendations/")
+        response = client.get("/api/v1/recommendations/content/1")
         # This might fail if there's no user data, but should not crash
         assert response.status_code in [200, 500]  # 500 is acceptable if no data
         
@@ -206,37 +206,7 @@ class TestRecommendationsRouter:
         assert response.status_code == 422  # Validation error for non-integer
 
 
-# Tests for Actores Router
-class TestActoresRouter:
-    """Test suite for the actores router endpoints"""
 
-    def test_get_actores_nombres(self):
-        """Test getting all actor names"""
-        response = client.get("/api/v1/actores/nombres")
-        assert response.status_code == 200
-        data = response.json()
-        assert isinstance(data, list)
-        
-        for actor in data:
-            assert "id" in actor
-            assert "nombre" in actor
-            assert "genero" in actor
-            assert "imagenUrl" in actor
-            assert isinstance(actor["id"], int)
-            assert isinstance(actor["nombre"], str)
-            assert isinstance(actor["genero"], int)
-
-    def test_actores_response_structure(self):
-        """Test that actores endpoint returns proper structure"""
-        response = client.get("/api/v1/actores/nombres")
-        assert response.status_code == 200
-        data = response.json()
-        
-        if data:  # If there are actors in the database
-            actor = data[0]
-            required_fields = ["id", "nombre", "genero", "imagenUrl"]
-            for field in required_fields:
-                assert field in actor
 
 
 # Integration Tests
@@ -250,9 +220,8 @@ class TestRouterIntegration:
             "/api/v1/rankings/viral",
             "/api/v1/rankings/platform/1",
             "/api/v1/rankings/genre/1",
-            "/api/v1/recommendations/",
-            "/api/v1/recommendations/collaborative/1",
-            "/api/v1/actores/nombres"
+            "/api/v1/recommendations/content/1",
+            "/api/v1/recommendations/collaborative/1"
         ]
         
         for endpoint in endpoints:

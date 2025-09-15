@@ -62,7 +62,7 @@ def test_get_movie_vectors(db_session, setup_movies_and_reviews):
 def test_get_recommendations(db_session, setup_movies_and_reviews):
     m1, m2, user, *_ = setup_movies_and_reviews
     engine = Recommendations(db_session)
-    recs = engine.get_recommendations()
+    recs = engine.get_recommendations(user_id=1)
     assert isinstance(recs, list)
     for movie, score in recs:
         assert isinstance(score, float)
@@ -115,7 +115,7 @@ def test_get_collaborative_recommendations(db_session, setup_movies_and_reviews)
 def test_recommendations_sin_reviews(db_session):
     engine = Recommendations(db_session)
     with pytest.raises(ValueError):
-        engine.get_recommendations()
+        engine.get_recommendations(user_id=1)
 
 # Test: edge case - usuario sin ratings
 def test_collaborative_sin_usuario(db_session, setup_movies_and_reviews):
