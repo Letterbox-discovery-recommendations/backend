@@ -54,9 +54,9 @@ class Recommendations:
 
         return movie_vectors
 
-    def get_recommendations(self):
+    def get_recommendations(self, user_id : int):
         all_movies = self.db_session.exec(select(Movie)).all()
-        liked_movies = self.get_user_recommendations()
+        liked_movies = self.get_user_recommendations(user_id)
         movie_vectors = self.get_movie_vectors(all_movies)
 
         liked_vectors = [
