@@ -13,7 +13,7 @@ router = APIRouter(prefix="/api/v1/recommendations", tags=["recommendations"])
 @router.get("/content/{user_id}", response_model=List[RecommendationResponse])
 async def get_content_recommendations(user_id: int,db_session: Session = Depends(get_session)):
     engine = Recommendations(db_session)
-    recommendations = engine.get_recommendations()
+    recommendations = engine.get_recommendations(user_id)
     response = [
         RecommendationResponse(movie=movie, score=score)
         for movie, score in recommendations
