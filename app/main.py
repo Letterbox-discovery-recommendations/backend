@@ -1,13 +1,15 @@
 from contextlib import asynccontextmanager
-from fastapi import FastAPI
-from app.db.config import create_db_and_tables, seed_initial_data
+from fastapi import FastAPI, Depends
+from fastapi.security import HTTPBearer
+
+from app.db.seed import create_db_and_tables, seed_initial_data
 from fastapi.middleware.cors import CORSMiddleware
 from app.routers import recommendations_router, rankings_router
 from strawberry.fastapi import GraphQLRouter
 from app.graphql.schema import schema
 import os
 
-# Crea el router de GraphQL
+from app.security import get_current_user
 
 
 @asynccontextmanager
@@ -23,9 +25,10 @@ graphql_app = GraphQLRouter(schema)
 
 app = FastAPI(lifespan=lifespan, swagger_ui_parameters={"syntaxHighlight": {"theme": "monokai"}})
 
-app.include_router(recommendations_router)
+app.include_router(recommendations_router, dependencies=[Depends(get_current_user)])
 app.include_router(rankings_router)
 app.include_router(graphql_app, prefix="/graphql", tags=["graphql"])
+
 
 
 origins = [
@@ -41,6 +44,8 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
 
 
 @app.get("/")
