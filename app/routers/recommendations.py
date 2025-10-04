@@ -3,7 +3,7 @@ from typing import List
 from fastapi import APIRouter, Depends
 from sqlmodel import Session
 
-from app.db.config import get_session
+from app.db.utils import get_session
 from app.models import RecommendationResponse
 from app.services import Recommendations
 
