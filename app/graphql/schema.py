@@ -6,7 +6,7 @@ from sqlalchemy.orm import selectinload
 from datetime import date
 
 # Importa los nuevos modelos de la base de datos
-from app.db.config import get_session
+from app.db.utils import get_session
 from app.models import (
     Movie as DBMovie,
     RealPerson as DBRealPerson,
