@@ -4,7 +4,9 @@ from dotenv import load_dotenv
 from sqlalchemy import Engine
 from sqlmodel import Session
 from app.db.utils import get_engine
-from app.db.movie_utils import process_movie_data
+from app.db.movie_utils import process_movie_data, update_movie_data, delete_movie_data
+from app.db.review_utils import process_review_created, process_review_updated, process_review_deleted
+from app.db.social_utils import process_follow_created, process_follow_deleted
 import os
 import logging
 
@@ -22,7 +24,14 @@ class RabbitMQConsumer:
         logger.info("Conexión con RabbitMQ establecida.")
 
         self.routing_key_handlers = {
-            "movie.created": self.handle_movie_created
+            "movie.created": self.handle_movie_created,
+            "movie.updated": self.handle_movie_updated,
+            "movie.deleted": self.handle_movie_deleted,
+            "rating.created": self.handle_review_created,
+            "rating.updated": self.handle_review_updated,
+            "rating.deleted": self.handle_review_deleted,
+            "social.created": self.handle_follow_created,
+            "social.deleted": self.handle_follow_deleted
         }
 
 
@@ -31,11 +40,51 @@ class RabbitMQConsumer:
         process_movie_data(session, body_data)
         logger.info("Película creada exitosamente.")
 
+    def handle_movie_updated(self, session, body_data):
+        logger.info(f"Procesando actualización de película: '{body_data.get('titulo', 'N/A')}'")
+        update_movie_data(session, body_data)
+        logger.info("Película actualizada exitosamente.")
+
+    def handle_movie_deleted(self, session, body_data):
+        movie_id = body_data.get('id', 'N/A')
+        logger.info(f"Procesando eliminación de película ID: {movie_id}")
+        delete_movie_data(session, body_data)
+        logger.info("Película eliminada exitosamente.")
+
+    def handle_review_created(self, session, body_data):
+        logger.info(f"Procesando creación de reseña para película ID: {body_data.get('movie_id', 'N/A')}")
+        process_review_created(session, body_data)
+        logger.info("Reseña creada exitosamente.")
+
+    def handle_review_updated(self, session, body_data):
+        logger.info(f"Procesando actualización de reseña ID: {body_data.get('id', 'N/A')}")
+        process_review_updated(session, body_data)
+        logger.info("Reseña actualizada exitosamente.")
+
+    def handle_review_deleted(self, session, body_data):
+        logger.info(f"Procesando eliminación de reseña ID: {body_data.get('id', 'N/A')}")
+        process_review_deleted(session, body_data)
+        logger.info("Reseña eliminada exitosamente.")
+
+    def handle_follow_created(self, session, body_data):
+        follower = body_data.get('follower_id', 'N/A')
+        followed = body_data.get('followed_id', 'N/A')
+        logger.info(f"Procesando nuevo seguimiento: usuario {follower} sigue a {followed}")
+        process_follow_created(session, body_data)
+        logger.info("Relación de seguimiento creada exitosamente.")
+
+    def handle_follow_deleted(self, session, body_data):
+        follower = body_data.get('follower_id', 'N/A')
+        followed = body_data.get('followed_id', 'N/A')
+        logger.info(f"Procesando eliminación de seguimiento: usuario {follower} deja de seguir a {followed}")
+        process_follow_deleted(session, body_data)
+        logger.info("Relación de seguimiento eliminada exitosamente.")
+
 
 
 
     def generic_event_callback(self, ch, method, properties, body):
-        routing_key = json.loads(body.decode("utf-8"))["type"]
+        routing_key = method.routing_key
         delivery_tag = method.delivery_tag
 
         logger.info(

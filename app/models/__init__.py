@@ -7,6 +7,7 @@ from .movie_payload import Movie as PydanticMovie
 from .platform import Platform
 from .links import CastLink, MovieGenreLink, MoviePlatformLink
 from .director import Director
+from .follow import Follow
 
 __all__ = [
     "Movie",
@@ -19,5 +20,6 @@ __all__ = [
     "RealPerson",
     "PydanticMovie",
     "Platform",
-    "Director"
+    "Director",
+    "Follow"
 ]
