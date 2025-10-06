@@ -11,6 +11,7 @@ from app.models import (
     PydanticMovie,
     Director,
     Review,
+    Follow,
 )
 
 # Importaciones desde tu módulo de utilidades
