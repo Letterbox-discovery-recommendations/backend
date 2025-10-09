@@ -26,6 +26,7 @@ jobs:
       DB_NAME: testdb
       DB_HOST: localhost
       DB_PORT: 5432
+      REPORT_ARTIFACT_NAME: test-report-pdf
     
     steps:
     - name: Checkout code
@@ -49,9 +50,81 @@ jobs:
 
     - name: Seed database
       run: uv run python -c "from app.db.config import seed_initial_data; seed_initial_data()"
+
+    - name: Create reports directory
+      run: mkdir -p reports
       
     - name: Run tests
       run: uv run pytest --maxfail=5 --tb=short
       
     - name: Check test coverage
-      run: uv run pytest --cov=app --cov-report=term-missing --cov-fail-under=85
+      run: uv run pytest --maxfail=5 --tb=short \
+          --junitxml=reports/junit.xml \
+          --html=reports/pytest_report.html --self-contained-html \
+          --cov=app \
+          --cov-report=term-missing \
+          --cov-report=xml:reports/coverage.xml \
+          --cov-report=html:reports/coverage_html \
+          --cov-fail-under=85
+
+    - name: Install PDF generation tools
+        # Siempre generar PDF, aun si fallan tests, para depurar
+      if: always()
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y wkhtmltopdf poppler-utils
+
+    - name: Generate cover page
+      if: always()
+      run: |
+        cat > reports/cover.html << 'EOF'
+        <!DOCTYPE html>
+        <html><head><meta charset="UTF-8">
+        <style>
+          body { font-family: Arial, sans-serif; text-align: center; padding: 80px 40px; }
+          h1 { color: #2c3e50; font-size: 40px; margin-bottom: 10px; }
+          h2 { color: #34495e; font-size: 22px; margin-bottom: 30px; }
+          .info { font-size: 14px; color: #7f8c8d; margin: 6px 0; }
+          .divider { border-top: 2px solid #3498db; width: 50%; margin: 30px auto; }
+        </style>
+        </head><body>
+          <h1>Reporte de Tests y Coverage</h1>
+          <h2>${{ github.repository }}</h2>
+          <div class="divider"></div>
+          <div class="info"><strong>Ref:</strong> ${{ github.ref_name }}</div>
+          <div class="info"><strong>Commit:</strong> ${{ github.sha }}</div>
+          <div class="info"><strong>Autor:</strong> ${{ github.actor }}</div>
+          <div class="info"><strong>Fecha:</strong> $(date '+%Y-%m-%d %H:%M:%S UTC')</div>
+          <div class="divider"></div>
+          <p style="margin-top: 40px; color: #95a5a6;">Generado por GitHub Actions</p>
+        </body></html>
+        EOF
+
+    - name: Convert reports to PDF and merge
+      if: always()
+      run: |
+        set -e
+        # Convert HTML → PDF
+        wkhtmltopdf reports/cover.html reports/00_cover.pdf || true
+        wkhtmltopdf reports/pytest_report.html reports/01_tests.pdf || true
+        wkhtmltopdf reports/coverage_html/index.html reports/02_coverage.pdf || true
+        # Merge (solo los existentes)
+        PDFs=()
+        [ -f reports/00_cover.pdf ] && PDFs+=("reports/00_cover.pdf")
+        [ -f reports/01_tests.pdf ] && PDFs+=("reports/01_tests.pdf")
+        [ -f reports/02_coverage.pdf ] && PDFs+=("reports/02_coverage.pdf")
+        if [ ${#PDFs[@]} -gt 0 ]; then
+          pdfunite "${PDFs[@]}" reports/test_coverage_report.pdf
+        else
+          echo "No hay PDFs para unificar"
+        fi
+        ls -l reports || true
+
+    - name: Upload test PDF artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: ${{ env.REPORT_ARTIFACT_NAME }}
+        path: |
+          reports/test_coverage_report.pdf
+        if-no-files-found: warn
+        retention-days: 1
