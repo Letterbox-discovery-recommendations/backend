@@ -54,21 +54,21 @@ jobs:
     - name: Seed database
       run: uv run python -c "from app.db.config import seed_initial_data; seed_initial_data()"
 
-    - name: Create reports directory
-      run: mkdir -p reports
-      
-    - name: Run tests
-      run: uv run pytest --maxfail=5 --tb=short
-      
-    - name: Check test coverage
-      run: uv run pytest --maxfail=5 --tb=short \
-          --junitxml=reports/junit.xml \
-          --html=reports/pytest_report.html --self-contained-html \
-          --cov=app \
-          --cov-report=term-missing \
-          --cov-report=xml:reports/coverage.xml \
-          --cov-report=html:reports/coverage_html \
-          --cov-fail-under=85
+    - name: Run tests with reports and coverage
+      run: |
+        mkdir -p reports
+        uv run pytest \
+        tests \
+        --maxfail=5 \
+        --tb=short \
+        --junitxml=reports/junit.xml \
+        --html=reports/pytest_report.html \
+        --self-contained-html \
+        --cov=app \
+        --cov-report=term-missing \
+        --cov-report=xml:reports/coverage.xml \
+        --cov-report=html:reports/coverage_html \
+        --cov-fail-under=85
 
     - name: Install PDF generation tools
         # Siempre generar PDF, aun si fallan tests, para depurar
