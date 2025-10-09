@@ -78,7 +78,7 @@ jobs:
     - name: Generate cover page
       if: always()
       run: |
-        cat > reports/cover.html << 'EOF'
+        cat > REPORTES/cover.html << 'EOF'
         <!DOCTYPE html>
         <html><head><meta charset="UTF-8">
         <style>
@@ -101,31 +101,31 @@ jobs:
         </body></html>
         EOF
 
-    - name: Convert reports to PDF and merge
+    - name: Convert REPORTES to PDF and merge
       if: always()
       run: |
         set -e
         # Convert HTML → PDF
-        wkhtmltopdf reports/cover.html reports/00_cover.pdf || true
-        wkhtmltopdf reports/pytest_report.html reports/01_tests.pdf || true
-        wkhtmltopdf reports/coverage_html/index.html reports/02_coverage.pdf || true
+        wkhtmltopdf REPORTES/cover.html REPORTES/00_cover.pdf || true
+        wkhtmltopdf REPORTES/pytest_report.html REPORTES/01_tests.pdf || true
+        wkhtmltopdf REPORTES/coverage_html/index.html REPORTES/02_coverage.pdf || true
         # Merge (solo los existentes)
         PDFs=()
-        [ -f reports/00_cover.pdf ] && PDFs+=("reports/00_cover.pdf")
-        [ -f reports/01_tests.pdf ] && PDFs+=("reports/01_tests.pdf")
-        [ -f reports/02_coverage.pdf ] && PDFs+=("reports/02_coverage.pdf")
+        [ -f REPORTES/00_cover.pdf ] && PDFs+=("REPORTES/00_cover.pdf")
+        [ -f REPORTES/01_tests.pdf ] && PDFs+=("REPORTES/01_tests.pdf")
+        [ -f REPORTES/02_coverage.pdf ] && PDFs+=("REPORTES/02_coverage.pdf")
         if [ ${#PDFs[@]} -gt 0 ]; then
-          pdfunite "${PDFs[@]}" reports/test_coverage_report.pdf
+          pdfunite "${PDFs[@]}" REPORTES/test_coverage_report.pdf
         else
           echo "No hay PDFs para unificar"
         fi
-        ls -l reports || true
+        ls -l REPORTES || true
 
     - name: Upload test PDF artifact
       uses: actions/upload-artifact@v4
       with:
         name: ${{ env.REPORT_ARTIFACT_NAME }}
         path: |
-          reports/test_coverage_report.pdf
+          REPORTES/test_coverage_report.pdf
         if-no-files-found: warn
         retention-days: 1
