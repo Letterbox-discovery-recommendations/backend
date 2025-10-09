@@ -56,22 +56,20 @@ jobs:
 
     - name: Run tests with reports and coverage
       run: |
-        mkdir -p reports
+        mkdir -p REPORTES
         uv run pytest \
-        tests \
         --maxfail=5 \
         --tb=short \
-        --junitxml=reports/junit.xml \
-        --html=reports/pytest_report.html \
+        --junitxml=REPORTES/junit.xml \
+        --html=REPORTES/pytest_report.html \
         --self-contained-html \
         --cov=app \
         --cov-report=term-missing \
-        --cov-report=xml:reports/coverage.xml \
-        --cov-report=html:reports/coverage_html \
+        --cov-report=xml:REPORTES/coverage.xml \
+        --cov-report=html:REPORTES/coverage_html \
         --cov-fail-under=85
 
     - name: Install PDF generation tools
-        # Siempre generar PDF, aun si fallan tests, para depurar
       if: always()
       run: |
         sudo apt-get update
