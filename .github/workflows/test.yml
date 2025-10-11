@@ -71,20 +71,11 @@ jobs:
         
         ls -l REPORTES
 
-    - name: Pre-check cover.css
-      if: always()
-      run: |
-        set -euo pipefail
-        if [ -f REPORTES/cover.css ]; then
-          echo "REPORTES/cover.css encontrado"
-        else
-          echo "REPORTES/cover.css no existe" >&2
-          exit 1
-        fi
-
     - name: Generate cover page
       if: always()
       run: |
+        set -euo pipefail
+        mkdir -p REPORTES
         cat > REPORTES/cover.html << EOF
         <!DOCTYPE html>
         <html lang="es">
@@ -92,7 +83,7 @@ jobs:
           <meta charset="UTF-8" />
           <meta name="viewport" content="width=device-width, initial-scale=1.0" />
           <title>Reporte de Tests y Coverage</title>
-          <link rel="stylesheet" href="cover.css" />
+          <link rel="stylesheet" href="REPORTES/cover.css" />
         </head>
         <body>
             <div class="container">
@@ -169,9 +160,9 @@ jobs:
       if: always()
       run: |
         set -e
-        wkhtmltopdf REPORTES/cover.html REPORTES/00_cover.pdf || true
-        wkhtmltopdf REPORTES/pytest_report.html REPORTES/01_tests.pdf || true
-        wkhtmltopdf REPORTES/coverage_html/index.html REPORTES/02_coverage.pdf || true
+        wkhtmltopdf --enable-local-file-access cover.html 00_cover.pdf || true
+        wkhtmltopdf --enable-local-file-access pytest_report.html 01_tests.pdf || true
+        wkhtmltopdf --enable-local-file-access coverage_html/index.html 02_coverage.pdf || true
         PDFs=()
         [ -f REPORTES/00_cover.pdf ] && PDFs+=("REPORTES/00_cover.pdf")
         [ -f REPORTES/01_tests.pdf ] && PDFs+=("REPORTES/01_tests.pdf")
