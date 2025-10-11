@@ -75,30 +75,36 @@ jobs:
         sudo apt-get update
         sudo apt-get install -y wkhtmltopdf poppler-utils
 
+    - name: Download CSS
+      env:
+        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      run: |
+        mkdir -p REPORTES
+        curl -H "Authorization: token ${GH_TOKEN}" \
+             -H "Accept: application/vnd.github.v3.raw" \
+             -fsSL https://api.github.com/repos/Letterbox-discovery-recommendations/coverage_reportes/contents/coverage.css?ref=main
+
     - name: Generate cover page
       if: always()
       run: |
         cat > REPORTES/cover.html << 'EOF'
         <!DOCTYPE html>
-        <html><head><meta charset="UTF-8">
-        <style>
-          body { font-family: Arial, sans-serif; text-align: center; padding: 80px 40px; }
-          h1 { color: #2c3e50; font-size: 40px; margin-bottom: 10px; }
-          h2 { color: #34495e; font-size: 22px; margin-bottom: 30px; }
-          .info { font-size: 14px; color: #7f8c8d; margin: 6px 0; }
-          .divider { border-top: 2px solid #3498db; width: 50%; margin: 30px auto; }
-        </style>
-        </head><body>
+        <html>
+        <head>
+          <meta charset="UTF-8">
+          <link rel="stylesheet" href="cover.css">
+        </head>
+        <body>
           <h1>Reporte de Tests y Coverage</h1>
-          <h2>${{ github.repository }}</h2>
+          <h2>{{REPO}}</h2>
           <div class="divider"></div>
-          <div class="info"><strong>Ref:</strong> ${{ github.ref_name }}</div>
-          <div class="info"><strong>Commit:</strong> ${{ github.sha }}</div>
-          <div class="info"><strong>Autor:</strong> ${{ github.actor }}</div>
-          <div class="info"><strong>Fecha:</strong> $(date '+%Y-%m-%d %H:%M:%S UTC')</div>
+          <div class="info"><strong>Ref:</strong> {{REF}}</div>
+          <div class="info"><strong>Commit:</strong> {{SHA}}</div>
+          <div class="info"><strong>Autor:</strong> {{ACTOR}}</div>
+          <div class="info"><strong>Fecha:</strong> {{DATE}}</div>
           <div class="divider"></div>
-          <p style="margin-top: 40px; color: #95a5a6;">Generado por GitHub Actions</p>
-        </body></html>
+        </body>
+        </html>
         EOF
 
     - name: Convert REPORTES to PDF and merge
