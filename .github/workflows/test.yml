@@ -10,6 +10,8 @@ on:
 jobs:
   test:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     services:
       postgres:
         image: postgres:15
@@ -78,11 +80,14 @@ jobs:
     - name: Download CSS
       env:
         GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        CSS_API_URL: https://api.github.com/repos/Letterbox-discovery-recommendations/coverage_reportes/contents/coverage.css?ref=main
       run: |
+        set -e
         mkdir -p REPORTES
-        curl -H "Authorization: token ${GH_TOKEN}" \
-             -H "Accept: application/vnd.github.v3.raw" \
-             -fsSL https://api.github.com/repos/Letterbox-discovery-recommendations/coverage_reportes/contents/coverage.css?ref=main
+        curl -w "%{http_code}" -o REPORTES/cover.css \
+        -H "Authorization: token ${GH_TOKEN}" \
+        -H "Accept: application/vnd.github.v3.raw" \
+        -fsSL "${CSS_API_URL}"
 
     - name: Generate cover page
       if: always()
