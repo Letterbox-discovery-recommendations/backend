@@ -48,6 +48,9 @@ jobs:
     - name: Test plugins
       run: uv pip install pytest pytest-cov pytest-html
 
+    - name: Prepare REPORTES dir
+      run: mkdir -p REPORTES
+
     - name: Download CSS
       env:
         GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
