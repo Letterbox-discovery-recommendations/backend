@@ -143,10 +143,10 @@ jobs:
         set -e
         if [ -f REPORTES/coverage_html/index.html ]; then
           if ! grep -q 'coverage.css' REPORTES/coverage_html/index.html; then
-            sed -i '0,/<head[^>]*>/s//&\
-            <link rel="stylesheet" href="REPORTES/coverage.css">/' REPORTES/coverage_html/index.html
+            sed -i '0,/<head[^>]*>/s||\&\
+          <link rel="stylesheet" href="REPORTES/coverage.css">|' REPORTES/coverage_html/index.html
+            fi
           fi
-        fi
 
     - name: Install PDF generation tools
       if: always()
