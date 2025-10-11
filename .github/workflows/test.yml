@@ -82,12 +82,28 @@ jobs:
         GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         CSS_API_URL: https://api.github.com/repos/Letterbox-discovery-recommendations/coverage_reportes/contents/coverage.css?ref=main
       run: |
-        set -e
+        set -euo pipefail
         mkdir -p REPORTES
-        curl -w "%{http_code}" -o REPORTES/cover.css \
-        -H "Authorization: token ${GH_TOKEN}" \
-        -H "Accept: application/vnd.github.v3.raw" \
-        -fsSL "${CSS_API_URL}"
+        STATUS_CODE=$(curl -w "%{http_code}" -o REPORTES/cover.css \
+          -H "Authorization: token ${GH_TOKEN}" \
+          -H "Accept: application/vnd.github.v3.raw" \
+          -fsSL "${CSS_API_URL}")
+    
+        echo "HTTP status: ${STATUS_CODE}"
+        if [ "${STATUS_CODE}" != "200" ]; then
+          echo "Error: descarga fallida con status ${STATUS_CODE}"
+          exit 1
+        fi
+        if [ ! -s REPORTES/cover.css ]; then
+          echo "Error: el archivo REPORTES/cover.css no existe o está vacío"
+          exit 1
+        fi
+        echo "Ruta del archivo descargado: $PWD/REPORTES/cover.css"
+        echo "Tamaño (bytes): $(wc -c < REPORTES/cover.css)"
+        if command -v sha256sum >/dev/null 2>&1; then
+          echo "SHA256: $(sha256sum REPORTES/cover.css | awk '{print $1}')"
+        fi
+        head -n 5 REPORTES/cover.css || true
 
     - name: Generate cover page
       if: always()
@@ -97,16 +113,15 @@ jobs:
         <html>
         <head>
           <meta charset="UTF-8">
-          <link rel="stylesheet" href="cover.css">
+          <link rel="stylesheet" href="REPORTES/cover.css">
         </head>
         <body>
           <h1>Reporte de Tests y Coverage</h1>
           <h2>{{REPO}}</h2>
           <div class="divider"></div>
-          <div class="info"><strong>Ref:</strong> {{REF}}</div>
-          <div class="info"><strong>Commit:</strong> {{SHA}}</div>
-          <div class="info"><strong>Autor:</strong> {{ACTOR}}</div>
-          <div class="info"><strong>Fecha:</strong> {{DATE}}</div>
+          <div class="info"><strong>Ref:</strong> {{ github.ref_name }}</div>
+          <div class="info"><strong>Commit:</strong> {{ github.sha }}</div>
+          <div class="info"><strong>Fecha:</strong> $(date '+%Y-%m-%d %H:%M:%S UTC') </div>
           <div class="divider"></div>
         </body>
         </html>
@@ -116,11 +131,9 @@ jobs:
       if: always()
       run: |
         set -e
-        # Convert HTML → PDF
         wkhtmltopdf REPORTES/cover.html REPORTES/00_cover.pdf || true
         wkhtmltopdf REPORTES/pytest_report.html REPORTES/01_tests.pdf || true
         wkhtmltopdf REPORTES/coverage_html/index.html REPORTES/02_coverage.pdf || true
-        # Merge (solo los existentes)
         PDFs=()
         [ -f REPORTES/00_cover.pdf ] && PDFs+=("REPORTES/00_cover.pdf")
         [ -f REPORTES/01_tests.pdf ] && PDFs+=("REPORTES/01_tests.pdf")
