@@ -65,54 +65,12 @@ jobs:
                -H "Accept: application/vnd.github.v3.raw" \
                -fsSL "${BASE_API}/${file}?ref=${REF}" -o "REPORTES/${file}"
         }
-        download_raw cover.css
+        
         download_raw coverage.css
         download_raw pytest.css
-        
+        download_raw cover.html
+    
         ls -l REPORTES
-
-    - name: Generate cover page
-      if: always()
-      run: |
-        set -euo pipefail
-        mkdir -p REPORTES
-        cat > REPORTES/cover.html << EOF
-        <!DOCTYPE html>
-        <html lang="es">
-        <head>
-          <meta charset="UTF-8" />
-          <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-          <title>Reporte de Tests y Coverage</title>
-          <link rel="stylesheet" href="REPORTES/cover.css" />
-        </head>
-        <body>
-            <div class="container">
-              <h1>Reporte de Tests y Coverage</h1>
-              <h2>Proyecto: <strong>${{ env.REPO }}</strong></h2>
-      
-              <div class="divider"></div>
-      
-              <div class="info">
-                <strong> Branch:</strong> ${{ github.ref_name }}
-              </div>
-              
-              <div class="info">
-                <strong> Commit:</strong> <code>${{ github.sha }}</code>
-              </div>
-              
-              <div class="info">
-                <strong> Fecha:</strong> $(date '+%Y-%m-%d %H:%M:%S UTC')
-              </div>
-              
-              <div class="info">
-                <strong> Workflow:</strong> ${{ github.workflow }}
-              </div>
-      
-              <div class="divider"></div>
-            </div>
-          </body>
-          </html>
-        EOF
 
     - name: Run migrations
       run: |
