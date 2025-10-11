@@ -71,6 +71,17 @@ jobs:
         
         ls -l REPORTES
 
+    - name: Pre-check cover.css
+      if: always()
+      run: |
+        set -euo pipefail
+        if [ -f REPORTES/cover.css ]; then
+          echo "REPORTES/cover.css encontrado"
+        else
+          echo "REPORTES/cover.css no existe" >&2
+          exit 1
+        fi
+
     - name: Generate cover page
       if: always()
       run: |
@@ -81,7 +92,7 @@ jobs:
           <meta charset="UTF-8" />
           <meta name="viewport" content="width=device-width, initial-scale=1.0" />
           <title>Reporte de Tests y Coverage</title>
-          <link rel="stylesheet" href="REPORTES/cover.css" />
+          <link rel="stylesheet" href="cover.css" />
         </head>
         <body>
             <div class="container">
@@ -144,7 +155,7 @@ jobs:
         if [ -f REPORTES/coverage_html/index.html ]; then
           if ! grep -q 'coverage.css' REPORTES/coverage_html/index.html; then
             sed -i '0,/<head[^>]*>/s||\&\
-          <link rel="stylesheet" href="REPORTES/coverage.css">|' REPORTES/coverage_html/index.html
+          <link rel="stylesheet" href="coverage.css">|' REPORTES/coverage_html/index.html
             fi
           fi
 
