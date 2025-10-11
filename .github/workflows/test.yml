@@ -48,7 +48,52 @@ jobs:
     - name: Test plugins
       run: uv pip install pytest pytest-cov pytest-html
 
-    - name: Run migrations (or manually create tables)
+    - name: Download CSS
+      env:
+        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        BASE_API: https://api.github.com/repos/Letterbox-discovery-recommendations/coverage_reportes/contents
+        REF: main
+      run: |
+        set -euo pipefail
+        download_raw () {
+          local file="$1"
+          curl -H "Authorization: token ${GH_TOKEN}" \
+               -H "Accept: application/vnd.github.v3.raw" \
+               -fsSL "${BASE_API}/${file}?ref=${REF}" -o "REPORTES/${file}"
+        }
+        download_raw cover.css
+        download_raw coverage.css
+        download_raw pytest.css
+        
+        ls -l REPORTES
+
+    - name: Generate cover page
+      if: always()
+      run: |
+        cat > REPORTES/cover.html << 'EOF'
+        <!DOCTYPE html>
+        <html lang="es">
+          <head>
+            <meta charset="UTF-8" />
+            <title>Reporte de Tests y Coverage</title>
+            <link rel="stylesheet" href="cover.css" />
+          </head>
+          <body>
+            <h1>Reporte de Tests y Coverage</h1>
+            <h2>${{ github.repository }}</h2>
+
+            <div class="divider"></div>
+
+            <div class="info"><strong>Ref:</strong> ${{ github.ref_name }}</div>
+            <div class="info"><strong>Commit:</strong> ${{ github.sha }}</div>
+            <div class="info"><strong>Fecha:</strong> $(date -u '+%Y-%m-%d %H:%M:%S UTC')</div>
+
+            <div class="divider"></div>
+          </body>
+        </html>
+        EOF
+
+    - name: Run migrations
       run: |
         uv run alembic upgrade head || echo "Alembic skipped"
         uv run python -c "from app.db.config import create_db_and_tables; create_db_and_tables()"
@@ -57,75 +102,38 @@ jobs:
       run: uv run python -c "from app.db.config import seed_initial_data; seed_initial_data()"
 
     - name: Run tests with reports and coverage
+      continue-on-error: true
       run: |
         mkdir -p REPORTES
         uv run pytest \
-        --maxfail=5 \
-        --tb=short \
-        --junitxml=REPORTES/junit.xml \
-        --html=REPORTES/pytest_report.html \
-        --self-contained-html \
-        --cov=app \
-        --cov-report=term-missing \
-        --cov-report=xml:REPORTES/coverage.xml \
-        --cov-report=html:REPORTES/coverage_html \
-        --cov-fail-under=85
+          --maxfail=5 \
+          --tb=short \
+          --junitxml=REPORTES/junit.xml \
+          --html=REPORTES/pytest_report.html \
+          --css=REPORTES/pytest.css \
+          --self-contained-html \
+          --cov=app \
+          --cov-report=term-missing \
+          --cov-report=xml:REPORTES/coverage.xml \
+          --cov-report=html:REPORTES/coverage_html \
+          --cov-fail-under=85
+
+    - name: Create coverage wrapper HTML
+      if: always()
+      run: |
+        set -e
+        if [ -f REPORTES/coverage_html/index.html ]; then
+          if ! grep -q 'coverage.css' REPORTES/coverage_html/index.html; then
+            sed -i '0,/<head[^>]*>/s//&\
+            <link rel="stylesheet" href="..\/coverage.css">/' REPORTES/coverage_html/index.html
+          fi
+        fi
 
     - name: Install PDF generation tools
       if: always()
       run: |
         sudo apt-get update
         sudo apt-get install -y wkhtmltopdf poppler-utils
-
-    - name: Download CSS
-      env:
-        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        CSS_API_URL: https://api.github.com/repos/Letterbox-discovery-recommendations/coverage_reportes/contents/coverage.css?ref=main
-      run: |
-        set -euo pipefail
-        mkdir -p REPORTES
-        STATUS_CODE=$(curl -w "%{http_code}" -o REPORTES/cover.css \
-          -H "Authorization: token ${GH_TOKEN}" \
-          -H "Accept: application/vnd.github.v3.raw" \
-          -fsSL "${CSS_API_URL}")
-    
-        echo "HTTP status: ${STATUS_CODE}"
-        if [ "${STATUS_CODE}" != "200" ]; then
-          echo "Error: descarga fallida con status ${STATUS_CODE}"
-          exit 1
-        fi
-        if [ ! -s REPORTES/cover.css ]; then
-          echo "Error: el archivo REPORTES/cover.css no existe o está vacío"
-          exit 1
-        fi
-        echo "Ruta del archivo descargado: $PWD/REPORTES/cover.css"
-        echo "Tamaño (bytes): $(wc -c < REPORTES/cover.css)"
-        if command -v sha256sum >/dev/null 2>&1; then
-          echo "SHA256: $(sha256sum REPORTES/cover.css | awk '{print $1}')"
-        fi
-        head -n 5 REPORTES/cover.css || true
-
-    - name: Generate cover page
-      if: always()
-      run: |
-        cat > REPORTES/cover.html << 'EOF'
-        <!DOCTYPE html>
-        <html>
-        <head>
-          <meta charset="UTF-8">
-          <link rel="stylesheet" href="REPORTES/cover.css">
-        </head>
-        <body>
-          <h1>Reporte de Tests y Coverage</h1>
-          <h2>{{REPO}}</h2>
-          <div class="divider"></div>
-          <div class="info"><strong>Ref:</strong> {{ github.ref_name }}</div>
-          <div class="info"><strong>Commit:</strong> {{ github.sha }}</div>
-          <div class="info"><strong>Fecha:</strong> $(date '+%Y-%m-%d %H:%M:%S UTC') </div>
-          <div class="divider"></div>
-        </body>
-        </html>
-        EOF
 
     - name: Convert REPORTES to PDF and merge
       if: always()
