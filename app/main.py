@@ -5,7 +5,7 @@ import logging
 from app.consumer import start_consuming
 from app.db.seed import create_db_and_tables, seed_initial_data
 from fastapi.middleware.cors import CORSMiddleware
-from app.routers import recommendations_router, rankings_router
+from app.routers import recommendations_router, rankings_router, visits_router
 from strawberry.fastapi import GraphQLRouter
 from app.graphql.schema import schema
 import os
@@ -38,6 +38,7 @@ app = FastAPI(lifespan=lifespan, swagger_ui_parameters={"syntaxHighlight": {"the
 app.include_router(recommendations_router, dependencies=[Depends(get_current_user)])
 app.include_router(rankings_router)
 app.include_router(graphql_app, prefix="/graphql", tags=["graphql"])
+app.include_router(visits_router, dependencies=[Depends(get_current_user)])
 
 
 
