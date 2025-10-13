@@ -71,7 +71,7 @@ jobs:
         download_raw cover.html
         ls -l REPORTES
 
-    - name: Generar cover.html final
+    - name: Generate data to cover.html
       shell: bash
       run: |
         ACTOR='${{ github.actor }}'
@@ -85,7 +85,7 @@ jobs:
              s/__ref_name__/${REF_NAME//\//\\/}/g; \
              s/__sha__/${SHA//\//\\/}/g; \
              s/__workflow__/${WORKFLOW//\//\\/}/g" \
-        cover.html
+        REPORTES/cover.html
 
     - name: Run migrations
       run: |
