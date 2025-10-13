@@ -69,8 +69,23 @@ jobs:
         download_raw coverage.css
         download_raw pytest.css
         download_raw cover.html
-    
         ls -l REPORTES
+
+    - name: Generar cover.html final
+      shell: bash
+      run: |
+        ACTOR='${{ github.actor }}'
+        DATE="$(date -u +'%Y-%m-%d %H:%M:%S UTC')"
+        REF_NAME='${{ github.ref_name }}'
+        SHA='${{ github.sha }}'
+        WORKFLOW='${{ github.workflow }}'
+        sed -i \
+            "s/__actor__/${ACTOR//\//\\/}/g; \
+             s/__date__/${DATE//\//\\/}/g; \
+             s/__ref_name__/${REF_NAME//\//\\/}/g; \
+             s/__sha__/${SHA//\//\\/}/g; \
+             s/__workflow__/${WORKFLOW//\//\\/}/g" \
+        cover.html
 
     - name: Run migrations
       run: |
@@ -104,7 +119,7 @@ jobs:
         if [ -f REPORTES/coverage_html/index.html ]; then
           if ! grep -q 'coverage.css' REPORTES/coverage_html/index.html; then
             sed -i '0,/<head[^>]*>/s||\&\
-          <link rel="stylesheet" href="coverage.css">|' REPORTES/coverage_html/index.html
+          <link rel="stylesheet" href="REPORTES/coverage.css">|' REPORTES/coverage_html/index.html
             fi
           fi
 
@@ -122,18 +137,18 @@ jobs:
         command -v pdfunite >/dev/null 2>&1 || { echo "pdfunite no está instalado"; exit 1; }
         
         ls -la REPORTES || { echo "No existe REPORTES/"; exit 0; }
-    
+        
         pushd REPORTES >/dev/null
         wkhtmltopdf --enable-local-file-access --print-media-type cover.html 00_cover.pdf || echo "cover.html -> PDF falló"
         wkhtmltopdf --enable-local-file-access --print-media-type pytest_report.html 01_tests.pdf || echo "pytest_report.html -> PDF falló"
         wkhtmltopdf --enable-local-file-access --print-media-type coverage_html/index.html 02_coverage.pdf || echo "coverage_html/index.html -> PDF falló"
         ls -la
-    
+        
         PDFs=()
         [ -f 00_cover.pdf ] && PDFs+=("00_cover.pdf")
         [ -f 01_tests.pdf ] && PDFs+=("01_tests.pdf")
         [ -f 02_coverage.pdf ] && PDFs+=("02_coverage.pdf")
-    
+        
         if [ ${#PDFs[@]} -gt 0 ]; then
           echo "Uniendo PDFs: ${PDFs[*]}"
           pdfunite "${PDFs[@]}" test_coverage_report.pdf
@@ -141,7 +156,7 @@ jobs:
         else
           echo "No hay PDFs para unificar"
         fi
-    
+        
         popd >/dev/null
         ls -la REPORTES || true
 
