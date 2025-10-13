@@ -3,14 +3,17 @@ name: Upload backend PDF to S3 from test.yml artifact
 on:
   workflow_run:
     workflows: ["Run Tests"]
-    types:
-      - completed
+    types: [completed]
 
 jobs:
   upload-to-s3:
-    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+    if: >
+      ${{
+        github.event.workflow_run.conclusion == 'success' &&
+        github.event.workflow_run.head_branch == 'dev' &&
+        github.event.workflow_run.event == 'push'
+      }}
     runs-on: ubuntu-latest
-
     environment: test-aws
 
     permissions:
@@ -28,30 +31,23 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
-      
-      - name: Download latest artifact from test.yml
+
+      - name: Download artifact from triggering run
         uses: dawidd6/action-download-artifact@v3
         with:
-          workflow: test.yml
-          branch: dev
+          run_id: ${{ github.event.workflow_run.id }}
           name: ${{ env.ARTIFACT_NAME }}
-          workflow_conclusion: success
           path: ./artifact
 
       - name: Verify artifact contents
         run: |
-          echo "Listing downloaded files:"
-          ls -la
-          if [ ! -f "${PDF_FILE_NAME}" ]; then
+          echo "Listing downloaded files in ./artifact:"
+          ls -la ./artifact
+          if [ ! -f "./artifact/${PDF_FILE_NAME}" ]; then
             echo "ERROR: No se encontró ${PDF_FILE_NAME} en el artefacto descargado."
             exit 1
           fi
 
-      - name: Check artifact corresponds to current dev push
-        run: |
-          SHORT_SHA="$(git rev-parse --short HEAD)"
-          echo "Commit actual corto: ${SHORT_SHA}"
-          
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
@@ -63,7 +59,7 @@ jobs:
         run: |
           DEST="s3://${S3_BUCKET_NAME}/${S3_DESTINATION_PREFIX}${PDF_FILE_NAME}"
           echo "Subiendo ${PDF_FILE_NAME} a ${DEST}"
-          aws s3 cp "${PDF_FILE_NAME}" "${DEST}" --only-show-errors
+          aws s3 cp "./artifact/${PDF_FILE_NAME}" "${DEST}" --only-show-errors
 
       - name: Success summary
         run: |
