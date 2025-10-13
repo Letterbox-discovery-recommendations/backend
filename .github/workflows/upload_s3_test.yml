@@ -1,0 +1,71 @@
+name: Upload backend PDF to S3 from test.yml artifact
+
+on:
+  push:
+    branches:
+      - dev
+  workflow_dispatch:
+
+jobs:
+  upload-to-s3:
+    if: >
+      github.event_name == 'workflow_dispatch' ||
+      (github.event_name == 'push' && contains(github.event.head_commit.message, 'Merge pull request'))
+    runs-on: ubuntu-latest
+
+    environment: test-aws
+
+    permissions:
+      actions: read
+      contents: read
+      id-token: write
+
+    env:
+      AWS_REGION: us-east-2
+      S3_BUCKET_NAME: ${{ secrets.S3_BUCKET_NAME }}
+      ARTIFACT_NAME: test-report-pdf
+      PDF_FILE_NAME: test_coverage_report.pdf
+      S3_DESTINATION_PREFIX: backend/
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      
+      - name: Download latest artifact from test.yml
+        uses: dawidd6/action-download-artifact@v3
+        with:
+          workflow: test.yml
+          branch: dev
+          name: ${{ env.ARTIFACT_NAME }}
+          workflow_conclusion: success
+
+      - name: Verify artifact contents
+        run: |
+          echo "Listing downloaded files:"
+          ls -la
+          if [ ! -f "${PDF_FILE_NAME}" ]; then
+            echo "ERROR: No se encontró ${PDF_FILE_NAME} en el artefacto descargado."
+            exit 1
+          fi
+
+      - name: Check artifact corresponds to current dev push
+        run: |
+          SHORT_SHA="$(git rev-parse --short HEAD)"
+          echo "Commit actual corto: ${SHORT_SHA}"
+          
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Upload PDF to S3
+        run: |
+          DEST="s3://${S3_BUCKET_NAME}/${S3_DESTINATION_PREFIX}${PDF_FILE_NAME}"
+          echo "Subiendo ${PDF_FILE_NAME} a ${DEST}"
+          aws s3 cp "${PDF_FILE_NAME}" "${DEST}" --only-show-errors
+
+      - name: Success summary
+        run: |
+          echo "PDF subido exitosamente a s3://${S3_BUCKET_NAME}/${S3_DESTINATION_PREFIX}${PDF_FILE_NAME}"
