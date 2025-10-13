@@ -95,7 +95,7 @@ jobs:
           set -euo pipefail
           uv run alembic upgrade head || echo "Alembic skipped"
           uv run python - <<'PY'
-          from app.db.config import create_db_and_tables
+          from app.db.seed import create_db_and_tables
           create_db_and_tables()
           PY
 
@@ -103,7 +103,7 @@ jobs:
         run: |
           set -euo pipefail
           uv run python - <<'PY'
-          from app.db.config import seed_initial_data
+          from app.db.seed import seed_initial_data
           seed_initial_data()
           PY
 
