@@ -23,7 +23,6 @@ security_scheme = HTTPBearer()
 class TokenPayload(BaseModel):
     sub: str
     exp: int
-
     user_id: int
     name: str
     last_name: str
