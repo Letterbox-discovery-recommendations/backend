@@ -3,9 +3,9 @@ name: Run Tests
 on:
   pull_request:
     branches: [ dev ]
-  workflow_dispatch:
   push:
-    branches: [ integracion-deploy ]
+    branches: [ dev, integracion-deploy ]
+  workflow_dispatch:
 
 jobs:
   test:
