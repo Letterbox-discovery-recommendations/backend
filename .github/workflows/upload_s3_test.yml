@@ -1,22 +1,14 @@
 name: Upload backend PDF to S3 from test.yml artifact
 
 on:
-  push:
-    branches: [ dev, integracion-deploy, test-integration ]
-  workflow_dispatch:
+  workflow_run:
+    workflows: ["Run Tests"]
+    types:
+      - completed
 
 jobs:
   upload-to-s3:
-    if: >
-      github.event_name == 'workflow_dispatch' ||
-      (
-        github.event_name == 'push' &&
-        (
-          contains(github.event.head_commit.message, 'Merge pull request') ||
-          contains(github.event.head_commit.message, 'squash') ||
-          contains(github.event.head_commit.message, '(#')
-        )
-      )
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
     runs-on: ubuntu-latest
 
     environment: test-aws
