@@ -1,4 +1,5 @@
 from random import random
+from typing import List
 from sqlmodel import Session, select, func
 import numpy as np
 import pandas as pd
@@ -6,6 +7,7 @@ from app.models import Movie, Review, Genre, Platform
 from datetime import datetime, timedelta
 
 positive_rating_threshold = 4.0
+group_agreement_threshold = 0.5  # Porcentaje mínimo de usuarios que deben gustar una película
 
 
 def cosine_similarity_manual(vec1: np.ndarray, vec2: np.ndarray) -> float:
@@ -191,4 +193,154 @@ class Recommendations:
         movies = self.db_session.exec(select(Movie).where(Movie.id.in_(movie_ids))).all()
         movie_dict = {m.id: m for m in movies}
 
+        return [{"movie": movie_dict[mid], "score": score} for mid, score in top_movies if mid in movie_dict]
+
+    def get_group_recommendations(self, user_ids: List[int], limit: int = 10):
+        """
+        Recomendaciones grupales que combinan las preferencias de múltiples usuarios.
+        
+        Args:
+            user_ids: Lista de IDs de usuarios para el grupo
+            limit: Número máximo de recomendaciones a retornar
+            
+        Returns:
+            Lista de diccionarios con películas recomendadas y scores ponderados
+        """
+        if len(user_ids) < 2:
+            raise ValueError("Se requieren al menos 2 usuarios para recomendaciones grupales")
+        
+        # 1. Obtener todas las reseñas del grupo
+        group_reviews_query = select(Review).where(Review.user_id.in_(user_ids))
+        group_reviews = self.db_session.exec(group_reviews_query).all()
+        
+        if not group_reviews:
+            return []
+        
+        # 2. Calcular actividad por usuario (para ponderación)
+        user_activity = {}
+        for user_id in user_ids:
+            user_review_count = len([r for r in group_reviews if r.user_id == user_id])
+            user_activity[user_id] = user_review_count
+        
+        total_activity = sum(user_activity.values())
+        if total_activity == 0:
+            return []
+        
+        # Calcular pesos de actividad normalizados
+        user_weights = {uid: count / total_activity for uid, count in user_activity.items()}
+        
+        # 3. MÉTODO CONTENT-BASED GRUPAL: Promediar vectores de perfil
+        all_movies = self.db_session.exec(select(Movie)).all()
+        movie_vectors = self.get_movie_vectors(all_movies)
+        
+        # Obtener películas que cada usuario ha visto
+        all_seen_movies = set()
+        user_profiles = {}
+        
+        for user_id in user_ids:
+            try:
+                liked_movies = self.get_user_recommendations(user_id)
+                all_seen_movies.update(liked_movies)
+                
+                # Crear perfil individual
+                liked_vectors = [
+                    movie_vectors[movie_id]
+                    for movie_id in liked_movies
+                    if movie_id in movie_vectors
+                ]
+                
+                if liked_vectors:
+                    user_profile = np.mean(liked_vectors, axis=0)
+                    user_profiles[user_id] = user_profile
+            except ValueError:
+                # Usuario sin suficientes datos
+                continue
+        
+        if not user_profiles:
+            # Si ningún usuario tiene perfil, retornar vacío
+            return []
+        
+        # Crear perfil grupal ponderado
+        group_profile = np.zeros(len(next(iter(user_profiles.values()))))
+        for user_id, profile in user_profiles.items():
+            weight = user_weights.get(user_id, 0)
+            group_profile += profile * weight
+        
+        # Normalizar el perfil grupal
+        if np.linalg.norm(group_profile) > 0:
+            group_profile = group_profile / np.linalg.norm(group_profile)
+        
+        # 4. Calcular similitud de películas no vistas con el perfil grupal
+        content_scores = {}
+        for movie in all_movies:
+            if movie.id not in all_seen_movies:
+                movie_vec = movie_vectors[movie.id]
+                sim_score = cosine_similarity_manual(group_profile, movie_vec)
+                if sim_score > 0:
+                    content_scores[movie.id] = sim_score
+        
+        # 5. MÉTODO COLLABORATIVE GRUPAL: Películas con rating positivo compartido
+        collaborative_scores = {}
+        
+        # Agrupar reseñas por película
+        movies_ratings = {}
+        for review in group_reviews:
+            if review.movie_id not in movies_ratings:
+                movies_ratings[review.movie_id] = []
+            movies_ratings[review.movie_id].append({
+                'user_id': review.user_id,
+                'rating': review.rating
+            })
+        
+        # Calcular scores colaborativos
+        min_users_agreement = max(2, int(len(user_ids) * group_agreement_threshold))
+        
+        for movie_id, ratings_list in movies_ratings.items():
+            if movie_id not in all_seen_movies:
+                # Contar cuántos usuarios dieron rating positivo
+                positive_ratings = [r['rating'] for r in ratings_list if r['rating'] >= positive_rating_threshold]
+                
+                if len(positive_ratings) >= min_users_agreement:
+                    # Score = promedio de ratings positivos * fracción de usuarios que lo calificaron positivamente
+                    avg_rating = np.mean(positive_ratings)
+                    agreement_ratio = len(positive_ratings) / len(user_ids)
+                    collaborative_scores[movie_id] = avg_rating * agreement_ratio
+        
+        # 6. FUSIÓN: Combinar scores de ambos métodos
+        combined_scores = {}
+        
+        # Ponderar: 60% content-based, 40% collaborative
+        content_weight = 0.6
+        collaborative_weight = 0.4
+        
+        # Normalizar scores de content-based
+        if content_scores:
+            max_content = max(content_scores.values())
+            normalized_content = {mid: score / max_content for mid, score in content_scores.items()}
+        else:
+            normalized_content = {}
+        
+        # Normalizar scores colaborativos
+        if collaborative_scores:
+            max_collaborative = max(collaborative_scores.values())
+            normalized_collaborative = {mid: score / max_collaborative for mid, score in collaborative_scores.items()}
+        else:
+            normalized_collaborative = {}
+        
+        # Combinar scores
+        all_movie_ids = set(normalized_content.keys()) | set(normalized_collaborative.keys())
+        
+        for movie_id in all_movie_ids:
+            content_score = normalized_content.get(movie_id, 0)
+            collab_score = normalized_collaborative.get(movie_id, 0)
+            combined_scores[movie_id] = (content_score * content_weight) + (collab_score * collaborative_weight)
+        
+        # 7. Ordenar y limitar resultados
+        top_movies = sorted(combined_scores.items(), key=lambda x: x[1], reverse=True)[:limit]
+        movie_ids = [m[0] for m in top_movies]
+        
+        # Obtener objetos Movie
+        movies = self.db_session.exec(select(Movie).where(Movie.id.in_(movie_ids))).all()
+        movie_dict = {m.id: m for m in movies}
+        
         return [{"movie": movie_dict[mid], "score": score} for mid, score in top_movies if mid in movie_dict]
