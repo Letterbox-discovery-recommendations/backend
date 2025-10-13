@@ -39,7 +39,7 @@ jobs:
       AWS_REGION: us-east-2
       S3_BUCKET_NAME: ${{ secrets.S3_BUCKET_NAME }}
       ARTIFACT_NAME: test-report-pdf
-      PDF_FILE_NAME: test_coverage_report.pdf
+      PDF_FILE_NAME: ${{ github.sha }}
       S3_DESTINATION_PREFIX: backend/
 
     steps:
