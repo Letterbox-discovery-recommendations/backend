@@ -24,14 +24,14 @@ class RabbitMQConsumer:
         logger.info("Conexión con RabbitMQ establecida.")
 
         self.routing_key_handlers = {
-            "movie.created": self.handle_movie_created,
-            "movie.updated": self.handle_movie_updated,
-            "movie.deleted": self.handle_movie_deleted,
-            "rating.created": self.handle_review_created,
-            "rating.updated": self.handle_review_updated,
-            "rating.deleted": self.handle_review_deleted,
-            "social.created": self.handle_follow_created,
-            "social.deleted": self.handle_follow_deleted
+            "peliculas.pelicula.creada": self.handle_movie_created,
+            "peliculas.pelicula.actualizada": self.handle_movie_updated,
+            "peliculas.pelicula.borrada": self.handle_movie_deleted,
+            "resenas.resena.creada": self.handle_review_created,
+            "resenas.resena.actualizada": self.handle_review_updated,
+            "resenas.resena.eliminada": self.handle_review_deleted,
+            "social.seguimiento.creado": self.handle_follow_created,
+            "social.seguimiento.borrado": self.handle_follow_deleted
         }
 
 
