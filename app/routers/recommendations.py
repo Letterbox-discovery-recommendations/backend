@@ -43,23 +43,54 @@ async def get_group_recommendations(
     """
     Obtiene recomendaciones grupales combinando las preferencias de múltiples usuarios.
     
-    - **user_ids**: Lista de 2 a 10 IDs de usuarios del grupo
+    Se puede usar de dos formas:
+    1. Proporcionar 'user_ids': Lista explícita de IDs de usuarios (2-10 usuarios)
+    2. Proporcionar 'base_user_id': Crea grupo automáticamente con el usuario + sus seguidores
+    
     - Requiere que el usuario autenticado esté incluido en el grupo
     - Combina perfiles individuales usando content-based y collaborative filtering
     - Pondera por actividad de cada usuario (número de reseñas)
     - Retorna películas que reflejan los intereses comunes del grupo
     """
-    # Validar que el usuario actual esté en el grupo
-    if current_user.user_id not in request.user_ids:
-        raise HTTPException(
-            status_code=403,
-            detail="El usuario autenticado debe ser parte del grupo para obtener recomendaciones grupales"
-        )
-    
     engine = Recommendations(db_session)
     
     try:
-        recommendations = engine.get_group_recommendations(request.user_ids)
+        if request.user_ids is not None:
+            # Método tradicional: lista explícita de usuarios
+            recommendations = engine.get_group_recommendations(request.user_ids)
+            
+            # Validar que el usuario actual esté en el grupo
+            if current_user.user_id not in request.user_ids:
+                raise HTTPException(
+                    status_code=403,
+                    detail="El usuario autenticado debe ser parte del grupo para obtener recomendaciones grupales"
+                )
+        
+        elif request.base_user_id is not None:
+            # Método por seguidores: grupo automático
+            recommendations = engine.get_group_recommendations_by_followers(request.base_user_id)
+            
+            # Validar que el usuario actual sea el base_user o esté entre sus seguidores
+            # (Esta validación se hace implícitamente en el método, pero podemos agregar más checks si es necesario)
+            if current_user.user_id != request.base_user_id:
+                # Verificar si el usuario actual es seguidor del base_user
+                from app.models import Follow
+                is_follower = db_session.exec(
+                    select(Follow).where(
+                        Follow.follower_id == current_user.user_id,
+                        Follow.followed_id == request.base_user_id
+                    )
+                ).first()
+                
+                if not is_follower:
+                    raise HTTPException(
+                        status_code=403,
+                        detail="Solo el usuario base o sus seguidores pueden solicitar recomendaciones grupales por seguidores"
+                    )
+        
+        else:
+            raise HTTPException(status_code=400, detail="Debe proporcionar 'user_ids' o 'base_user_id'")
+    
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
     

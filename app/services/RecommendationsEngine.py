@@ -3,7 +3,7 @@ from typing import List
 from sqlmodel import Session, select, func
 import numpy as np
 import pandas as pd
-from app.models import Movie, Review, Genre, Platform
+from app.models import Movie, Review, Genre, Platform, Follow
 from datetime import datetime, timedelta
 
 positive_rating_threshold = 4.0
@@ -344,3 +344,37 @@ class Recommendations:
         movie_dict = {m.id: m for m in movies}
         
         return [{"movie": movie_dict[mid], "score": score} for mid, score in top_movies if mid in movie_dict]
+
+    def get_group_recommendations_by_followers(self, user_id: int, limit: int = 10):
+        """
+        Recomendaciones grupales basadas en los seguidores de un usuario.
+        
+        Crea automáticamente un grupo con el usuario base + todos sus seguidores,
+        luego genera recomendaciones grupales.
+        
+        Args:
+            user_id: ID del usuario base (cuyos seguidores formarán el grupo)
+            limit: Número máximo de recomendaciones a retornar
+            
+        Returns:
+            Lista de diccionarios con películas recomendadas y scores ponderados
+        """
+        # Obtener todos los seguidores del usuario
+        followers_query = select(Follow.follower_id).where(Follow.followed_id == user_id)
+        followers_result = self.db_session.exec(followers_query).all()
+        
+        # Extraer los IDs de seguidores
+        follower_ids = [f.follower_id for f in followers_result]
+        
+        # Crear el grupo completo: usuario base + seguidores
+        group_user_ids = [user_id] + follower_ids
+        
+        # Validar que haya suficientes usuarios para formar un grupo
+        if len(group_user_ids) < 2:
+            raise ValueError(
+                f"El usuario {user_id} no tiene suficientes seguidores para formar un grupo. "
+                f"Se encontraron {len(follower_ids)} seguidores, se necesitan al menos 1."
+            )
+        
+        # Usar el método existente para generar recomendaciones grupales
+        return self.get_group_recommendations(group_user_ids, limit)
