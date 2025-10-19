@@ -31,9 +31,12 @@ class RabbitMQConsumer:
             "resenas.resena.actualizada": self.handle_review_updated,
             "resenas.resena.eliminada": self.handle_review_deleted,
             "social.seguimiento.creado": self.handle_follow_created,
-            "social.seguimiento.borrado": self.handle_follow_deleted
+            "social.seguimiento.borrado": self.handle_follow_deleted,
+            "usuarios.usuario.creado" : self.handle_user_created
         }
 
+    def handle_user_created(self, session, body_data):
+        logger.info("Nuevo usuario creado.")
 
     def handle_movie_created(self, session, body_data):
         logger.info(f"Procesando creación de película: '{body_data.get('titulo', 'N/A')}'")
