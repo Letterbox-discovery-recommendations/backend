@@ -18,9 +18,11 @@ class GroupRecommendationRequest(BaseModel):
         max_length=10,
         description="Lista de IDs de usuarios del grupo (mínimo 2, máximo 10)"
     )
-    base_user_id: int = Field(
+    base_user_ids: List[int] = Field(
         default=None,
-        description="ID del usuario base para crear grupo automáticamente con sus seguidores"
+        min_length=1,
+        max_length=5,
+        description="Lista de IDs de usuarios base para crear grupo automáticamente con sus seguidores"
     )
     
     @field_validator('user_ids')
@@ -31,16 +33,24 @@ class GroupRecommendationRequest(BaseModel):
             raise ValueError("Los IDs de usuario no pueden estar duplicados")
         return v
     
+    @field_validator('base_user_ids')
+    @classmethod
+    def validate_base_user_ids(cls, v: List[int]) -> List[int]:
+        """Validar que no haya IDs duplicados en base_user_ids."""
+        if v is not None and len(v) != len(set(v)):
+            raise ValueError("Los IDs de usuario base no pueden estar duplicados")
+        return v
+    
     @model_validator(mode='after')
     def validate_request_type(self):
         """Validar que se proporcione exactamente uno de los dos tipos de request."""
         has_user_ids = self.user_ids is not None
-        has_base_user = self.base_user_id is not None
+        has_base_user_ids = self.base_user_ids is not None
         
-        if not has_user_ids and not has_base_user:
-            raise ValueError("Debe proporcionar 'user_ids' o 'base_user_id'")
+        if not has_user_ids and not has_base_user_ids:
+            raise ValueError("Debe proporcionar 'user_ids' o 'base_user_ids'")
         
-        if has_user_ids and has_base_user:
-            raise ValueError("No puede proporcionar ambos 'user_ids' y 'base_user_id' al mismo tiempo")
+        if has_user_ids and has_base_user_ids:
+            raise ValueError("No puede proporcionar ambos 'user_ids' y 'base_user_ids' al mismo tiempo")
         
         return self

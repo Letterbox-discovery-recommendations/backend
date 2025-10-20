@@ -345,36 +345,71 @@ class Recommendations:
         
         return [{"movie": movie_dict[mid], "score": score} for mid, score in top_movies if mid in movie_dict]
 
-    def get_group_recommendations_by_followers(self, user_id: int, limit: int = 10):
+    def get_group_recommendations_by_followers(self, user_ids: List[int]):
         """
-        Recomendaciones grupales basadas en los seguidores de un usuario.
+        Recomendaciones grupales basadas en los seguidores de múltiples usuarios.
         
-        Crea automáticamente un grupo con el usuario base + todos sus seguidores,
+        Crea automáticamente un grupo con los usuarios base + todos sus seguidores combinados,
         luego genera recomendaciones grupales.
         
         Args:
-            user_id: ID del usuario base (cuyos seguidores formarán el grupo)
-            limit: Número máximo de recomendaciones a retornar
+            user_ids: Lista de IDs de usuarios base (cuyos seguidores formarán el grupo)
             
         Returns:
             Lista de diccionarios con películas recomendadas y scores ponderados
         """
-        # Obtener todos los seguidores del usuario
-        followers_query = select(Follow.follower_id).where(Follow.followed_id == user_id)
-        followers_result = self.db_session.exec(followers_query).all()
+        if not user_ids:
+            raise ValueError("Se requiere al menos un usuario base")
         
-        # Extraer los IDs de seguidores
-        follower_ids = [f.follower_id for f in followers_result]
+        # Obtener todos los seguidores de todos los usuarios base
+        all_followers = set()
+        for user_id in user_ids:
+            followers_query = select(Follow.follower_id).where(Follow.followed_id == user_id)
+            followers_result = self.db_session.exec(followers_query).all()
+            follower_ids = [f.follower_id for f in followers_result]
+            all_followers.update(follower_ids)
         
-        # Crear el grupo completo: usuario base + seguidores
-        group_user_ids = [user_id] + follower_ids
+        # Crear el grupo completo: usuarios base + todos los seguidores combinados
+        group_user_ids = list(set(user_ids) | all_followers)
         
         # Validar que haya suficientes usuarios para formar un grupo
         if len(group_user_ids) < 2:
             raise ValueError(
-                f"El usuario {user_id} no tiene suficientes seguidores para formar un grupo. "
-                f"Se encontraron {len(follower_ids)} seguidores, se necesitan al menos 1."
+                f"Los usuarios {user_ids} no tienen suficientes seguidores para formar un grupo. "
+                f"Se encontraron {len(all_followers)} seguidores únicos, se necesitan al menos 2 usuarios totales."
             )
         
         # Usar el método existente para generar recomendaciones grupales
-        return self.get_group_recommendations(group_user_ids, limit)
+        return self.get_group_recommendations(group_user_ids, 10)
+
+    def get_followed(self, user_id: int) -> List[int]:
+        """
+        Obtiene los seguidores mutuos (amigos) de un usuario.
+        
+        Un seguidor mutuo es alguien que sigue al usuario Y el usuario lo sigue a él.
+        
+        Args:
+            user_id: ID del usuario para el cual buscar amigos mutuos
+            
+        Returns:
+            Lista de IDs de usuarios que tienen una relación de seguimiento bidireccional
+        """
+        # Primero, obtener los IDs de quienes siguen al usuario
+        followers_subquery = select(Follow.follower_id).where(Follow.followed_id == user_id)
+        
+        # Luego, de esos seguidores, obtener quienes el usuario también sigue
+        mutual_followers_query = (
+            select(Follow.followed_id)
+            .where(
+                Follow.follower_id == user_id,
+                Follow.followed_id.in_(followers_subquery)
+            )
+        )
+        
+        # Ejecutar la query
+        result = self.db_session.exec(mutual_followers_query).all()
+        
+        # Extraer los IDs únicos
+        mutual_follower_ids = list(set(result))
+        
+        return mutual_follower_ids

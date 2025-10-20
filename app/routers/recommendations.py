@@ -1,10 +1,10 @@
 from typing import List
 
 from fastapi import APIRouter, Depends, HTTPException
-from sqlmodel import Session
+from sqlmodel import Session, select
 
 from app.db.utils import get_session
-from app.models import RecommendationResponse, GroupRecommendationRequest
+from app.models import RecommendationResponse, GroupRecommendationRequest, Follow
 from app.security import get_current_user, TokenPayload
 from app.services import Recommendations
 
@@ -45,7 +45,7 @@ async def get_group_recommendations(
     
     Se puede usar de dos formas:
     1. Proporcionar 'user_ids': Lista explícita de IDs de usuarios (2-10 usuarios)
-    2. Proporcionar 'base_user_id': Crea grupo automáticamente con el usuario + sus seguidores
+    2. Proporcionar 'base_user_ids': Lista de IDs de usuarios base para crear grupo automáticamente con sus seguidores
     
     - Requiere que el usuario autenticado esté incluido en el grupo
     - Combina perfiles individuales usando content-based y collaborative filtering
@@ -66,9 +66,30 @@ async def get_group_recommendations(
                     detail="El usuario autenticado debe ser parte del grupo para obtener recomendaciones grupales"
                 )
         
-        elif request.base_user_id is not None:
+        elif request.base_user_ids is not None:
             # Método por seguidores: grupo automático
-            recommendations = engine.get_group_recommendations_by_followers(request.base_user_id)
+            recommendations = engine.get_group_recommendations_by_followers(request.base_user_ids)
+            
+            # Validar que el usuario actual sea uno de los base_users o esté entre sus seguidores
+            if current_user.user_id not in request.base_user_ids:
+                # Verificar si el usuario actual es seguidor de al menos uno de los base_users
+                is_follower_of_any = False
+                for base_user_id in request.base_user_ids:
+                    follower_check = db_session.exec(
+                        select(Follow).where(
+                            Follow.follower_id == current_user.user_id,
+                            Follow.followed_id == base_user_id
+                        )
+                    ).first()
+                    if follower_check:
+                        is_follower_of_any = True
+                        break
+                
+                if not is_follower_of_any:
+                    raise HTTPException(
+                        status_code=403,
+                        detail="Solo los usuarios base o sus seguidores pueden solicitar recomendaciones grupales por seguidores"
+                    )
             
             # Validar que el usuario actual sea el base_user o esté entre sus seguidores
             # (Esta validación se hace implícitamente en el método, pero podemos agregar más checks si es necesario)
