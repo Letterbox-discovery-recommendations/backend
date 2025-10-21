@@ -4,7 +4,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlmodel import Session, select
 
 from app.db.utils import get_session
-from app.models import RecommendationResponse, GroupRecommendationRequest, Follow
+from app.models import RecommendationResponse, GroupRecommendationRequest, FriendResponse, Follow
 from app.security import get_current_user, TokenPayload
 from app.services import Recommendations
 
@@ -34,6 +34,25 @@ async def get_collaborative_recommendations(db_session: Session = Depends(get_se
     return response
 
 
+@router.get("/friends", response_model=List[FriendResponse])
+async def get_friends(
+    db_session: Session = Depends(get_session),
+    current_user: TokenPayload = Depends(get_current_user)
+):
+    """
+    Obtiene la lista de amigos (seguidores mutuos) del usuario autenticado.
+    
+    Un amigo es alguien que sigue al usuario Y el usuario lo sigue a él.
+    
+    Returns:
+        Lista de amigos con id, nombre y foto
+    """
+    engine = Recommendations(db_session)
+    friends = engine.get_followed(current_user.user_id)
+    
+    return friends
+
+
 @router.post("/group", response_model=List[RecommendationResponse])
 async def get_group_recommendations(
     request: GroupRecommendationRequest,
@@ -43,9 +62,10 @@ async def get_group_recommendations(
     """
     Obtiene recomendaciones grupales combinando las preferencias de múltiples usuarios.
     
-    Se puede usar de dos formas:
+    Se puede usar de tres formas:
     1. Proporcionar 'user_ids': Lista explícita de IDs de usuarios (2-10 usuarios)
     2. Proporcionar 'base_user_ids': Lista de IDs de usuarios base para crear grupo automáticamente con sus seguidores
+    3. Proporcionar 'user_id' y 'friend_ids': Usuario solicitante + lista de amigos seleccionados
     
     - Requiere que el usuario autenticado esté incluido en el grupo
     - Combina perfiles individuales usando content-based y collaborative filtering
@@ -90,27 +110,32 @@ async def get_group_recommendations(
                         status_code=403,
                         detail="Solo los usuarios base o sus seguidores pueden solicitar recomendaciones grupales por seguidores"
                     )
+        
+        elif request.user_id is not None and request.friend_ids is not None:
+            # Nuevo método: usuario + amigos seleccionados
+            if request.user_id != current_user.user_id:
+                raise HTTPException(
+                    status_code=403,
+                    detail="El user_id debe ser el del usuario autenticado"
+                )
             
-            # Validar que el usuario actual sea el base_user o esté entre sus seguidores
-            # (Esta validación se hace implícitamente en el método, pero podemos agregar más checks si es necesario)
-            if current_user.user_id != request.base_user_id:
-                # Verificar si el usuario actual es seguidor del base_user
-                from app.models import Follow
-                is_follower = db_session.exec(
-                    select(Follow).where(
-                        Follow.follower_id == current_user.user_id,
-                        Follow.followed_id == request.base_user_id
-                    )
-                ).first()
-                
-                if not is_follower:
-                    raise HTTPException(
-                        status_code=403,
-                        detail="Solo el usuario base o sus seguidores pueden solicitar recomendaciones grupales por seguidores"
-                    )
+            # Verificar que los friend_ids sean realmente amigos del usuario
+            user_friends = engine.get_followed(current_user.user_id)
+            friend_ids_from_db = [friend["id"] for friend in user_friends]
+            
+            invalid_friends = set(request.friend_ids) - set(friend_ids_from_db)
+            if invalid_friends:
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Los siguientes IDs no son amigos del usuario: {list(invalid_friends)}"
+                )
+            
+            # Crear la lista completa de usuarios para el grupo
+            group_user_ids = [request.user_id] + request.friend_ids
+            recommendations = engine.get_group_recommendations(group_user_ids)
         
         else:
-            raise HTTPException(status_code=400, detail="Debe proporcionar 'user_ids' o 'base_user_id'")
+            raise HTTPException(status_code=400, detail="Método de request no válido")
     
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
