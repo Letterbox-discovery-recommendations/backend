@@ -7,6 +7,7 @@ from app.db.utils import get_engine
 from app.db.movie_utils import process_movie_data, update_movie_data, delete_movie_data
 from app.db.review_utils import process_review_created, process_review_updated, process_review_deleted
 from app.db.social_utils import process_follow_created, process_follow_deleted
+from app.db.user_utils import process_user_created, process_user_updated
 import os
 import logging
 
@@ -24,6 +25,7 @@ class RabbitMQConsumer:
         logger.info("Conexión con RabbitMQ establecida.")
 
         self.routing_key_handlers = {
+            
             "peliculas.pelicula.creada": self.handle_movie_created,
             "peliculas.pelicula.actualizada": self.handle_movie_updated,
             "peliculas.pelicula.borrada": self.handle_movie_deleted,
@@ -31,10 +33,10 @@ class RabbitMQConsumer:
             "resenas.resena.actualizada": self.handle_review_updated,
             "resenas.resena.eliminada": self.handle_review_deleted,
             "social.seguimiento.creado": self.handle_follow_created,
-            "social.seguimiento.borrado": self.handle_follow_deleted
+            "social.seguimiento.borrado": self.handle_follow_deleted,
+            "usuarios.usuario.creado": self.handle_user_created,
+            "usuarios.usuario.actualizado": self.handle_user_updated
         }
-
-
     def handle_movie_created(self, session, body_data):
         logger.info(f"Procesando creación de película: '{body_data.get('titulo', 'N/A')}'")
         process_movie_data(session, body_data)
@@ -79,6 +81,20 @@ class RabbitMQConsumer:
         logger.info(f"Procesando eliminación de seguimiento: usuario {follower} deja de seguir a {followed}")
         process_follow_deleted(session, body_data)
         logger.info("Relación de seguimiento eliminada exitosamente.")
+
+    def handle_user_created(self, session, body_data):
+        user_id = body_data.get('idUsuario', 'N/A')
+        user_name = body_data.get('nombre', 'N/A')
+        logger.info(f"Procesando creación de usuario: '{user_name}' (ID: {user_id})")
+        process_user_created(session, body_data)
+        logger.info("Usuario creado exitosamente.")
+
+    def handle_user_updated(self, session, body_data):
+        user_id = body_data.get('idUsuario', 'N/A')
+        user_name = body_data.get('nombre', 'N/A')
+        logger.info(f"Procesando actualización de usuario: '{user_name}' (ID: {user_id})")
+        process_user_updated(session, body_data)
+        logger.info("Usuario actualizado exitosamente.")
 
 
 
