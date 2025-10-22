@@ -14,7 +14,18 @@ class FriendResponse(BaseModel):
     """Respuesta para información de un amigo."""
     id: int
     nombre: str
-    foto: str
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
+from typing import List
+from app.models import Movie
+
+
+class RecommendationResponse(BaseModel):
+    movie: Movie
+    score: float
 
     model_config = ConfigDict(from_attributes=True)
 

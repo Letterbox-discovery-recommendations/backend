@@ -3,7 +3,7 @@ from typing import List
 from sqlmodel import Session, select, func
 import numpy as np
 import pandas as pd
-from app.models import Movie, Review, Genre, Platform, Follow, CachedUser
+from app.models import Movie, Review, Genre, Platform, Follow
 from datetime import datetime, timedelta
 
 positive_rating_threshold = 4.0
@@ -382,9 +382,9 @@ class Recommendations:
         # Usar el método existente para generar recomendaciones grupales
         return self.get_group_recommendations(group_user_ids, 10)
 
-    def get_followed(self, user_id: int) -> List[dict]:
+    def get_followed(self, user_id: int) -> List[int]:
         """
-        Obtiene los seguidores mutuos (amigos) de un usuario con sus detalles.
+        Obtiene los seguidores mutuos (amigos) de un usuario.
         
         Un seguidor mutuo es alguien que sigue al usuario Y el usuario lo sigue a él.
         
@@ -392,7 +392,7 @@ class Recommendations:
             user_id: ID del usuario para el cual buscar amigos mutuos
             
         Returns:
-            Lista de diccionarios con id, nombre y foto de los amigos mutuos
+            Lista de IDs de usuarios que tienen una relación de seguimiento bidireccional
         """
         # Primero, obtener los IDs de quienes siguen al usuario
         followers_subquery = select(Follow.follower_id).where(Follow.followed_id == user_id)
@@ -406,24 +406,10 @@ class Recommendations:
             )
         )
         
-        # Ejecutar la query para obtener IDs
-        mutual_follower_ids = self.db_session.exec(mutual_followers_query).all()
-        mutual_follower_ids = list(set(mutual_follower_ids))  # Eliminar duplicados
+        # Ejecutar la query
+        result = self.db_session.exec(mutual_followers_query).all()
         
-        if not mutual_follower_ids:
-            return []
+        # Extraer los IDs únicos
+        mutual_follower_ids = list(set(result))
         
-        # Obtener detalles de los usuarios del caché
-        users_query = select(CachedUser).where(CachedUser.id.in_(mutual_follower_ids))
-        users = self.db_session.exec(users_query).all()
-        
-        # Crear lista de respuesta con id, nombre y foto
-        friends = []
-        for user in users:
-            friends.append({
-                "id": user.id,
-                "nombre": user.name,
-                "foto": user.profile_picture_url
-            })
-        
-        return friends
+        return mutual_follower_ids

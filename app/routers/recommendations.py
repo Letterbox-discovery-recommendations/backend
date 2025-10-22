@@ -4,7 +4,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlmodel import Session, select
 
 from app.db.utils import get_session
-from app.models import RecommendationResponse, GroupRecommendationRequest, FriendResponse, Follow
+from app.models import RecommendationResponse, GroupRecommendationRequest, Follow
 from app.security import get_current_user, TokenPayload
 from app.services import Recommendations
 
@@ -34,7 +34,7 @@ async def get_collaborative_recommendations(db_session: Session = Depends(get_se
     return response
 
 
-@router.get("/friends", response_model=List[FriendResponse])
+@router.get("/friends", response_model=List[int])
 async def get_friends(
     db_session: Session = Depends(get_session),
     current_user: TokenPayload = Depends(get_current_user)
@@ -45,7 +45,7 @@ async def get_friends(
     Un amigo es alguien que sigue al usuario Y el usuario lo sigue a él.
     
     Returns:
-        Lista de amigos con id, nombre y foto
+        Lista de IDs de amigos
     """
     engine = Recommendations(db_session)
     friends = engine.get_followed(current_user.user_id)

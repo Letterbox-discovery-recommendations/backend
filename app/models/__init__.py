@@ -8,7 +8,6 @@ from .platform import Platform
 from .links import CastLink, MovieGenreLink, MoviePlatformLink
 from .director import Director
 from .follow import Follow
-from .cached_user import CachedUser
 
 __all__ = [
     "Movie",
@@ -23,6 +22,5 @@ __all__ = [
     "PydanticMovie",
     "Platform",
     "Director",
-    "Follow",
-    "CachedUser"
+    "Follow"
 ]
