@@ -121,7 +121,7 @@ async def get_group_recommendations(
             
             # Verificar que los friend_ids sean realmente amigos del usuario
             user_friends = engine.get_followed(current_user.user_id)
-            friend_ids_from_db = [friend["id"] for friend in user_friends]
+            friend_ids_from_db = user_friends  # get_followed retorna List[int]
             
             invalid_friends = set(request.friend_ids) - set(friend_ids_from_db)
             if invalid_friends:

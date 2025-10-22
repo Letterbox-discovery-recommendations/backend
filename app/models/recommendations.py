@@ -18,18 +18,6 @@ class FriendResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
-from typing import List
-from app.models import Movie
-
-
-class RecommendationResponse(BaseModel):
-    movie: Movie
-    score: float
-
-    model_config = ConfigDict(from_attributes=True)
-
-
 class GroupRecommendationRequest(BaseModel):
     """Request body para recomendaciones grupales."""
     user_ids: List[int] = Field(
