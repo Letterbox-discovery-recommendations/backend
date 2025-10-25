@@ -1,53 +1,124 @@
 from fastapi.testclient import TestClient
 from app.main import app
 import pytest
-import app.routers.recommendations as recommendations_router
 from unittest.mock import patch
+
+from app.security import get_current_user, TokenPayload
 
 client = TestClient(app)
 
-# Test: GET /api/v1/recommendations/ (global recommendations)
+
+@pytest.fixture(autouse=True)
+def override_auth_dependency(monkeypatch):
+    """Sustituye la dependencia `get_current_user` por un usuario simulado para los tests.
+
+    Esto evita llamadas al JWKS externo y permite controlar `user_id`.
+    """
+    fake_user = TokenPayload(
+        sub="test-sub",
+        exp=9999999999,
+        user_id=1,
+        name="Test",
+        last_name="User",
+        email="test@example.com",
+        role="user",
+        permissions=[],
+        is_active=True,
+        full_name="Test User",
+    )
+
+    app.dependency_overrides[get_current_user] = lambda: fake_user
+
+    # Parchear los métodos de Recommendations para no depender de la base de datos
+    from app.models import Movie
+
+    sample_movie = Movie(
+        id=1,
+        titulo="Pelicula Test",
+        sinopsis="Sinopsis",
+        duracionMinutos=100,
+        fechaEstreno=None,
+        posterUrl=None,
+        activa=True,
+        director_id=None,
+    )
+
+    monkeypatch.setattr(
+        "app.routers.recommendations.Recommendations.get_recommendations",
+        lambda self, user_id: [(sample_movie, 0.9)],
+    )
+
+    monkeypatch.setattr(
+        "app.routers.recommendations.Recommendations.get_collaborative_recommendations",
+        lambda self, user_id: [{"movie": sample_movie, "score": 0.8}],
+    )
+
+    yield
+
+    app.dependency_overrides.pop(get_current_user, None)
+
+
+# Test: GET /api/v1/recommendations/content (global recommendations)
 def test_get_global_recommendations():
-    user_id = 1
-    response = client.get(f"/api/v1/recommendations/content/{user_id}")
+    response = client.get("/api/v1/recommendations/content")
     assert response.status_code == 200
     data = response.json()
     assert isinstance(data, list)
     for item in data:
         assert "movie" in item and "score" in item
 
-# Test: GET /api/v1/recommendations/collaborative/{user_id} (collaborative recommendations)
+
+# Test: GET /api/v1/recommendations/collaborative (collaborative recommendations)
 def test_get_collaborative_recommendations():
-    user_id = 1  # Usa un ID válido en tu base de datos de test
-    response = client.get(f"/api/v1/recommendations/collaborative/{user_id}")
+    response = client.get("/api/v1/recommendations/collaborative")
     assert response.status_code == 200
     data = response.json()
     assert isinstance(data, list)
     for item in data:
         assert "movie" in item and "score" in item
 
-# Test: GET /api/v1/recommendations/collaborative/{user_id} (usuario no existe)
-def test_get_collaborative_recommendations_usuario_no_existe():
-    response = client.get("/api/v1/recommendations/collaborative/99999")
-    assert response.status_code in (200, 404)  # Depende de tu implementación
-    if response.status_code == 200:
-        data = response.json()
-        assert data == []
 
-# Test: GET /api/v1/recommendations/ (sin recomendaciones)
+# Test: GET /api/v1/recommendations/collaborative (usuario no existe)
+def test_get_collaborative_recommendations_usuario_no_existe(monkeypatch):
+    # Override auth to simulate a non-existent user id
+    fake_user = TokenPayload(
+        sub="test-sub",
+        exp=9999999999,
+        user_id=99999,
+        name="No",
+        last_name="User",
+        email="no@example.com",
+        role="user",
+        permissions=[],
+        is_active=True,
+        full_name="No User",
+    )
+    app.dependency_overrides[get_current_user] = lambda: fake_user
+
+    # Para este caso específico, parcheamos el método para devolver []
+    monkeypatch.setattr(
+        "app.routers.recommendations.Recommendations.get_collaborative_recommendations",
+        lambda self, user_id: [],
+    )
+
+    response = client.get("/api/v1/recommendations/collaborative")
+    # Según la implementación, cuando no hay ratings la función devuelve []
+    assert response.status_code == 200
+    assert response.json() == []
+
+
+# Test: GET /api/v1/recommendations/content (sin recomendaciones)
 def test_get_global_recommendations_sin_datos():
     with patch(
         "app.routers.recommendations.Recommendations.get_recommendations",
         return_value=[],
     ):
-        user_id = 1
-        response = client.get(f"/api/v1/recommendations/content/{user_id}")
+        response = client.get("/api/v1/recommendations/content")
         assert response.status_code == 200
         assert response.json() == []
 
+
 # Test: Edge case - método no permitido
 def test_post_not_allowed():
-    user_id = 1
-
-    response = client.post(f"/api/v1/recommendations/content/{user_id}")
+    response = client.post("/api/v1/recommendations/content")
     assert response.status_code == 405
