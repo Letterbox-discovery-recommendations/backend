@@ -76,64 +76,9 @@ async def get_group_recommendations(
     
     try:
         if request.user_ids is not None:
-            # Método tradicional: lista explícita de usuarios
-            recommendations = engine.get_group_recommendations(request.user_ids)
-            
-            # Validar que el usuario actual esté en el grupo
-            if current_user.user_id not in request.user_ids:
-                raise HTTPException(
-                    status_code=403,
-                    detail="El usuario autenticado debe ser parte del grupo para obtener recomendaciones grupales"
-                )
-        
-        elif request.base_user_ids is not None:
-            # Método por seguidores: grupo automático
-            recommendations = engine.get_group_recommendations_by_followers(request.base_user_ids)
-            
-            # Validar que el usuario actual sea uno de los base_users o esté entre sus seguidores
-            if current_user.user_id not in request.base_user_ids:
-                # Verificar si el usuario actual es seguidor de al menos uno de los base_users
-                is_follower_of_any = False
-                for base_user_id in request.base_user_ids:
-                    follower_check = db_session.exec(
-                        select(Follow).where(
-                            Follow.follower_id == current_user.user_id,
-                            Follow.followed_id == base_user_id
-                        )
-                    ).first()
-                    if follower_check:
-                        is_follower_of_any = True
-                        break
-                
-                if not is_follower_of_any:
-                    raise HTTPException(
-                        status_code=403,
-                        detail="Solo los usuarios base o sus seguidores pueden solicitar recomendaciones grupales por seguidores"
-                    )
-        
-        elif request.user_id is not None and request.friend_ids is not None:
-            # Nuevo método: usuario + amigos seleccionados
-            if request.user_id != current_user.user_id:
-                raise HTTPException(
-                    status_code=403,
-                    detail="El user_id debe ser el del usuario autenticado"
-                )
-            
-            # Verificar que los friend_ids sean realmente amigos del usuario
-            user_friends = engine.get_followed(current_user.user_id)
-            friend_ids_from_db = user_friends  # get_followed retorna List[int]
-            
-            invalid_friends = set(request.friend_ids) - set(friend_ids_from_db)
-            if invalid_friends:
-                raise HTTPException(
-                    status_code=400,
-                    detail=f"Los siguientes IDs no son amigos del usuario: {list(invalid_friends)}"
-                )
-            
-            # Crear la lista completa de usuarios para el grupo
-            group_user_ids = [request.user_id] + request.friend_ids
-            recommendations = engine.get_group_recommendations(group_user_ids)
-        
+
+            all_users = [current_user.user_id] + request.user_ids
+            recommendations = engine.get_group_recommendations(all_users)
         else:
             raise HTTPException(status_code=400, detail="Método de request no válido")
     
