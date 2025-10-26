@@ -39,10 +39,7 @@ async def get_similar_movies(
     movie_id: int,
     limit: int = 10,
     exclude_watched: bool = True,
-@router.get("/friends", response_model=List[int])
-async def get_friends(
-    db_session: Session = Depends(get_session),
-    current_user: TokenPayload = Depends(get_current_user)
+db_session: Session = Depends(get_session),current_user: TokenPayload = Depends(get_current_user)
 ):
     """
     Obtiene películas similares a una película específica basadas en metadatos.
@@ -70,20 +67,50 @@ async def get_friends(
 @router.get("/cowatch/{movie_id}", response_model=List[RecommendationResponse])
 async def get_cowatch_recommendations(
     movie_id: int,
-    limit: int = 10)
-  
+    limit: int = 10,
+    db_session: Session = Depends(get_session),
+    current_user: TokenPayload = Depends(get_current_user),
+):
+    """
+    Obtiene películas vistas conjuntamente: "Usuarios que vieron X también vieron Y".
+    Basado en co-visualización y ratings positivos compartidos.
+
+    Parámetros:
+    - movie_id: ID de la película de referencia
+    - limit: cantidad de recomendaciones (default 10, max 50)
+
+    Retorna: Lista de películas con métrica de co-visualización como score
+    """
+    limit = min(limit, 50)
+    engine = Recommendations(db_session)
+
+    recommendations = engine.get_cowatch_recommendations(movie_id, limit)
+
+    response = [
+        RecommendationResponse(movie=item["movie"], score=item["support"])
+        for item in recommendations
+    ]
+    return response
+
+
+@router.get("/friends", response_model=List[int])
+async def get_friends(
+    db_session: Session = Depends(get_session),
+    current_user: TokenPayload = Depends(get_current_user),
+):
     """
     Obtiene la lista de amigos (seguidores mutuos) del usuario autenticado.
-    
+
     Un amigo es alguien que sigue al usuario Y el usuario lo sigue a él.
-    
+
     Returns:
         Lista de IDs de amigos
     """
     engine = Recommendations(db_session)
     friends = engine.get_followed(current_user.user_id)
-    
+
     return friends
+
 
 
 @router.post("/group", response_model=List[RecommendationResponse])
@@ -109,64 +136,9 @@ async def get_group_recommendations(
     
     try:
         if request.user_ids is not None:
-            # Método tradicional: lista explícita de usuarios
-            recommendations = engine.get_group_recommendations(request.user_ids)
-            
-            # Validar que el usuario actual esté en el grupo
-            if current_user.user_id not in request.user_ids:
-                raise HTTPException(
-                    status_code=403,
-                    detail="El usuario autenticado debe ser parte del grupo para obtener recomendaciones grupales"
-                )
-        
-        elif request.base_user_ids is not None:
-            # Método por seguidores: grupo automático
-            recommendations = engine.get_group_recommendations_by_followers(request.base_user_ids)
-            
-            # Validar que el usuario actual sea uno de los base_users o esté entre sus seguidores
-            if current_user.user_id not in request.base_user_ids:
-                # Verificar si el usuario actual es seguidor de al menos uno de los base_users
-                is_follower_of_any = False
-                for base_user_id in request.base_user_ids:
-                    follower_check = db_session.exec(
-                        select(Follow).where(
-                            Follow.follower_id == current_user.user_id,
-                            Follow.followed_id == base_user_id
-                        )
-                    ).first()
-                    if follower_check:
-                        is_follower_of_any = True
-                        break
-                
-                if not is_follower_of_any:
-                    raise HTTPException(
-                        status_code=403,
-                        detail="Solo los usuarios base o sus seguidores pueden solicitar recomendaciones grupales por seguidores"
-                    )
-        
-        elif request.user_id is not None and request.friend_ids is not None:
-            # Nuevo método: usuario + amigos seleccionados
-            if request.user_id != current_user.user_id:
-                raise HTTPException(
-                    status_code=403,
-                    detail="El user_id debe ser el del usuario autenticado"
-                )
-            
-            # Verificar que los friend_ids sean realmente amigos del usuario
-            user_friends = engine.get_followed(current_user.user_id)
-            friend_ids_from_db = user_friends  # get_followed retorna List[int]
-            
-            invalid_friends = set(request.friend_ids) - set(friend_ids_from_db)
-            if invalid_friends:
-                raise HTTPException(
-                    status_code=400,
-                    detail=f"Los siguientes IDs no son amigos del usuario: {list(invalid_friends)}"
-                )
-            
-            # Crear la lista completa de usuarios para el grupo
-            group_user_ids = [request.user_id] + request.friend_ids
-            recommendations = engine.get_group_recommendations(group_user_ids)
-        
+            users_list = request.user_ids + [current_user.user_id]
+            recommendations = engine.get_group_recommendations(users_list)
+
         else:
             raise HTTPException(status_code=400, detail="Método de request no válido")
     
