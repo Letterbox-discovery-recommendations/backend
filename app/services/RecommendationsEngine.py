@@ -195,6 +195,177 @@ class Recommendations:
 
         return [{"movie": movie_dict[mid], "score": score} for mid, score in top_movies if mid in movie_dict]
 
+    def get_similar_movies_by_metadata(self, reference_movie_id: int, limit: int = 10, exclude_watched_by_user: int = None):
+        """
+        Retorna películas similares basadas en metadatos (género, director, año, duración).
+        
+        Args:
+            reference_movie_id: ID de la película de referencia
+            limit: cantidad máxima de películas a retornar
+            exclude_watched_by_user: si se proporciona user_id, excluye películas ya vistas
+            
+        Returns:
+            Lista de tuplas (movie, similarity_score)
+        """
+        # Obtener película de referencia
+        ref_movie = self.db_session.get(Movie, reference_movie_id)
+        if not ref_movie:
+            raise ValueError(f"Película {reference_movie_id} no encontrada")
+        
+        # Obtener todas las películas activas
+        all_movies = self.db_session.exec(select(Movie).where(Movie.activa == True)).all()
+        
+        # Calcular similitud con cada película
+        similarities = []
+        for movie in all_movies:
+            if movie.id == reference_movie_id:
+                continue
+            
+            # Filtrar películas ya vistas si se especifica usuario
+            if exclude_watched_by_user:
+                watched = self.db_session.exec(
+                    select(Review).where(
+                        Review.user_id == exclude_watched_by_user,
+                        Review.movie_id == movie.id
+                    )
+                ).first()
+                if watched:
+                    continue
+            
+            score = self._calculate_movie_similarity(ref_movie, movie)
+            if score > 0:
+                similarities.append((movie, score))
+        
+        # Ordenar por similitud descendente y retornar Top-K
+        similarities.sort(key=lambda x: x[1], reverse=True)
+        return similarities[:limit]
+
+    def get_cowatch_recommendations(self, reference_movie_id: int, limit: int = 10):
+        """
+        Retorna películas vistas junto con la película referencia.
+        Implementa: "Usuarios que vieron X también vieron Y".
+        
+        Args:
+            reference_movie_id: ID de la película de referencia
+            limit: cantidad máxima de películas a retornar
+            
+        Returns:
+            Lista de dicts con estructura: {"movie": Movie, "support": float, "avg_rating": float, "watch_count": int}
+        """
+        # Obtener usuarios que vieron la película referencia con rating positivo
+        users_who_watched = self.db_session.exec(
+            select(Review).where(
+                Review.movie_id == reference_movie_id,
+                Review.rating >= positive_rating_threshold
+            )
+        ).all()
+        
+        user_ids_watching_ref = {r.user_id for r in users_who_watched}
+        
+        if not user_ids_watching_ref:
+            return []
+        
+        # Encontrar películas que estos usuarios también vieron
+        cowatch_counts = {}
+        
+        for user_id in user_ids_watching_ref:
+            other_movies = self.db_session.exec(
+                select(Review).where(
+                    Review.user_id == user_id,
+                    Review.movie_id != reference_movie_id,
+                    Review.rating >= positive_rating_threshold
+                )
+            ).all()
+            
+            for review in other_movies:
+                movie_id = review.movie_id
+                if movie_id not in cowatch_counts:
+                    cowatch_counts[movie_id] = {
+                        'count': 0,
+                        'total_rating': 0.0
+                    }
+                cowatch_counts[movie_id]['count'] += 1
+                cowatch_counts[movie_id]['total_rating'] += review.rating
+        
+        # Calcular métricas y filtrar
+        total_watchers = len(user_ids_watching_ref)
+        recommendations = []
+        
+        for movie_id, data in cowatch_counts.items():
+            support = data['count'] / total_watchers
+            avg_rating = data['total_rating'] / data['count']
+            
+            # Filtrar por mínimo support (5%)
+            if support >= 0.05:
+                movie = self.db_session.get(Movie, movie_id)
+                if movie:
+                    recommendations.append({
+                        'movie': movie,
+                        'support': round(support, 3),
+                        'avg_rating': round(avg_rating, 2),
+                        'watch_count': data['count']
+                    })
+        
+        # Ordenar por support descendente
+        recommendations.sort(key=lambda x: x['support'], reverse=True)
+        return recommendations[:limit]
+
+    def _calculate_movie_similarity(self, movie1: Movie, movie2: Movie) -> float:
+        """
+        Calcula similitud ponderada entre dos películas.
+        Pesos: 35% géneros, 30% director, 20% año, 15% duración
+        """
+        weights = {
+            'genres': 0.35,
+            'director': 0.30,
+            'year': 0.20,
+            'duration': 0.15
+        }
+        
+        score = (
+            weights['genres'] * self._genre_similarity(movie1, movie2) +
+            weights['director'] * self._director_similarity(movie1, movie2) +
+            weights['year'] * self._year_similarity(movie1, movie2) +
+            weights['duration'] * self._duration_similarity(movie1, movie2)
+        )
+        return score
+
+    def _genre_similarity(self, movie1: Movie, movie2: Movie) -> float:
+        """Jaccard similarity entre géneros."""
+        genres1 = {g.id for g in movie1.generos}
+        genres2 = {g.id for g in movie2.generos}
+        
+        if not genres1 or not genres2:
+            return 0.0
+        
+        intersection = len(genres1 & genres2)
+        union = len(genres1 | genres2)
+        return intersection / union if union > 0 else 0.0
+
+    def _director_similarity(self, movie1: Movie, movie2: Movie) -> float:
+        """1.0 si mismo director, 0 sino."""
+        if movie1.director_id and movie2.director_id:
+            return 1.0 if movie1.director_id == movie2.director_id else 0.0
+        return 0.0
+
+    def _year_similarity(self, movie1: Movie, movie2: Movie) -> float:
+        """Gaussiana para años similares (sigma=5)."""
+        if not movie1.fechaEstreno or not movie2.fechaEstreno:
+            return 0.5
+        
+        year1 = movie1.fechaEstreno.year
+        year2 = movie2.fechaEstreno.year
+        diff = abs(year1 - year2)
+        
+        sigma = 5
+        return float(np.exp(-(diff**2) / (2 * sigma**2)))
+
+    def _duration_similarity(self, movie1: Movie, movie2: Movie) -> float:
+        """Gaussiana para duraciones similares (sigma=20 minutos)."""
+        diff = abs(movie1.duracionMinutos - movie2.duracionMinutos)
+        sigma = 20
+        return float(np.exp(-(diff**2) / (2 * sigma**2)))
+
     def get_group_recommendations(self, user_ids: List[int], limit: int = 10):
         """
         Recomendaciones grupales que combinan las preferencias de múltiples usuarios.
