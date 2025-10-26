@@ -35,7 +35,7 @@ graphql_app = GraphQLRouter(schema)
 
 app = FastAPI(lifespan=lifespan, swagger_ui_parameters={"syntaxHighlight": {"theme": "monokai"}})
 
-app.include_router(recommendations_router, dependencies=[Depends(get_current_user)])
+app.include_router(recommendations_router)
 app.include_router(rankings_router)
 app.include_router(graphql_app, prefix="/graphql", tags=["graphql"])
 app.include_router(visits_router, dependencies=[Depends(get_current_user)])

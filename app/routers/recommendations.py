@@ -38,8 +38,7 @@ async def get_collaborative_recommendations(db_session: Session = Depends(get_se
 async def get_similar_movies(
     movie_id: int,
     limit: int = 10,
-    exclude_watched: bool = True,
-db_session: Session = Depends(get_session),current_user: TokenPayload = Depends(get_current_user)
+    db_session: Session = Depends(get_session)
 ):
     """
     Obtiene películas similares a una película específica basadas en metadatos.
@@ -47,15 +46,14 @@ db_session: Session = Depends(get_session),current_user: TokenPayload = Depends(
     Parámetros:
     - movie_id: ID de la película de referencia
     - limit: cantidad de recomendaciones (default 10, max 50)
-    - exclude_watched: excluir películas ya vistas por el usuario
     
     Retorna: Lista de películas similares con score de similitud
     """
     limit = min(limit, 50)
     engine = Recommendations(db_session)
     
-    user_id = current_user.user_id if exclude_watched else None
-    recommendations = engine.get_similar_movies_by_metadata(movie_id, limit, user_id)
+
+    recommendations = engine.get_similar_movies_by_metadata(movie_id, limit)
     
     response = [
         RecommendationResponse(movie=movie, score=score)
@@ -64,33 +62,6 @@ db_session: Session = Depends(get_session),current_user: TokenPayload = Depends(
     return response
 
 
-@router.get("/cowatch/{movie_id}", response_model=List[RecommendationResponse])
-async def get_cowatch_recommendations(
-    movie_id: int,
-    limit: int = 10,
-    db_session: Session = Depends(get_session),
-    current_user: TokenPayload = Depends(get_current_user),
-):
-    """
-    Obtiene películas vistas conjuntamente: "Usuarios que vieron X también vieron Y".
-    Basado en co-visualización y ratings positivos compartidos.
-
-    Parámetros:
-    - movie_id: ID de la película de referencia
-    - limit: cantidad de recomendaciones (default 10, max 50)
-
-    Retorna: Lista de películas con métrica de co-visualización como score
-    """
-    limit = min(limit, 50)
-    engine = Recommendations(db_session)
-
-    recommendations = engine.get_cowatch_recommendations(movie_id, limit)
-
-    response = [
-        RecommendationResponse(movie=item["movie"], score=item["support"])
-        for item in recommendations
-    ]
-    return response
 
 
 @router.get("/friends", response_model=List[int])

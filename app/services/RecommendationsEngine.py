@@ -195,14 +195,13 @@ class Recommendations:
 
         return [{"movie": movie_dict[mid], "score": score} for mid, score in top_movies if mid in movie_dict]
 
-    def get_similar_movies_by_metadata(self, reference_movie_id: int, limit: int = 10, exclude_watched_by_user: int = None):
+    def get_similar_movies_by_metadata(self, reference_movie_id: int, limit: int = 10):
         """
         Retorna películas similares basadas en metadatos (género, director, año, duración).
         
         Args:
             reference_movie_id: ID de la película de referencia
             limit: cantidad máxima de películas a retornar
-            exclude_watched_by_user: si se proporciona user_id, excluye películas ya vistas
             
         Returns:
             Lista de tuplas (movie, similarity_score)
@@ -220,17 +219,7 @@ class Recommendations:
         for movie in all_movies:
             if movie.id == reference_movie_id:
                 continue
-            
-            # Filtrar películas ya vistas si se especifica usuario
-            if exclude_watched_by_user:
-                watched = self.db_session.exec(
-                    select(Review).where(
-                        Review.user_id == exclude_watched_by_user,
-                        Review.movie_id == movie.id
-                    )
-                ).first()
-                if watched:
-                    continue
+
             
             score = self._calculate_movie_similarity(ref_movie, movie)
             if score > 0:
@@ -240,75 +229,6 @@ class Recommendations:
         similarities.sort(key=lambda x: x[1], reverse=True)
         return similarities[:limit]
 
-    def get_cowatch_recommendations(self, reference_movie_id: int, limit: int = 10):
-        """
-        Retorna películas vistas junto con la película referencia.
-        Implementa: "Usuarios que vieron X también vieron Y".
-        
-        Args:
-            reference_movie_id: ID de la película de referencia
-            limit: cantidad máxima de películas a retornar
-            
-        Returns:
-            Lista de dicts con estructura: {"movie": Movie, "support": float, "avg_rating": float, "watch_count": int}
-        """
-        # Obtener usuarios que vieron la película referencia con rating positivo
-        users_who_watched = self.db_session.exec(
-            select(Review).where(
-                Review.movie_id == reference_movie_id,
-                Review.rating >= positive_rating_threshold
-            )
-        ).all()
-        
-        user_ids_watching_ref = {r.user_id for r in users_who_watched}
-        
-        if not user_ids_watching_ref:
-            return []
-        
-        # Encontrar películas que estos usuarios también vieron
-        cowatch_counts = {}
-        
-        for user_id in user_ids_watching_ref:
-            other_movies = self.db_session.exec(
-                select(Review).where(
-                    Review.user_id == user_id,
-                    Review.movie_id != reference_movie_id,
-                    Review.rating >= positive_rating_threshold
-                )
-            ).all()
-            
-            for review in other_movies:
-                movie_id = review.movie_id
-                if movie_id not in cowatch_counts:
-                    cowatch_counts[movie_id] = {
-                        'count': 0,
-                        'total_rating': 0.0
-                    }
-                cowatch_counts[movie_id]['count'] += 1
-                cowatch_counts[movie_id]['total_rating'] += review.rating
-        
-        # Calcular métricas y filtrar
-        total_watchers = len(user_ids_watching_ref)
-        recommendations = []
-        
-        for movie_id, data in cowatch_counts.items():
-            support = data['count'] / total_watchers
-            avg_rating = data['total_rating'] / data['count']
-            
-            # Filtrar por mínimo support (5%)
-            if support >= 0.05:
-                movie = self.db_session.get(Movie, movie_id)
-                if movie:
-                    recommendations.append({
-                        'movie': movie,
-                        'support': round(support, 3),
-                        'avg_rating': round(avg_rating, 2),
-                        'watch_count': data['count']
-                    })
-        
-        # Ordenar por support descendente
-        recommendations.sort(key=lambda x: x['support'], reverse=True)
-        return recommendations[:limit]
 
     def _calculate_movie_similarity(self, movie1: Movie, movie2: Movie) -> float:
         """
