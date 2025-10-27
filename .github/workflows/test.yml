@@ -3,13 +3,15 @@ name: Run Tests
 on:
   pull_request:
     branches: [ dev ]
-  workflow_dispatch:
   push:
     branches: [ integracion-deploy ]
+  workflow_dispatch:
 
 jobs:
   test:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     services:
       postgres:
         image: postgres:15
@@ -26,6 +28,8 @@ jobs:
       DB_NAME: testdb
       DB_HOST: localhost
       DB_PORT: 5432
+      REPORT_ARTIFACT_NAME: test-report-pdf
+      REPO: D&R Testing Backend
     
     steps:
     - name: Checkout code
@@ -41,17 +45,126 @@ jobs:
       
     - name: Install dependencies
       run: uv sync --frozen
+      
+    - name: Test plugins
+      run: uv pip install pytest pytest-cov pytest-html
 
-    - name: Run migrations (or manually create tables)
+    - name: Prepare REPORTES dir
+      run: mkdir -p REPORTES
+
+    - name: Download CSS
+      env:
+        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        BASE_API: https://api.github.com/repos/Letterbox-discovery-recommendations/coverage_reportes/contents
+        REF: main
+      run: |
+        set -euo pipefail
+        download_raw () {
+          local file="$1"
+          curl -H "Authorization: token ${GH_TOKEN}" \
+               -H "Accept: application/vnd.github.v3.raw" \
+               -fsSL "${BASE_API}/${file}?ref=${REF}" -o "REPORTES/${file}"
+        }
+        
+        download_raw coverage.css
+        download_raw pytest.css
+        download_raw cover.html
+        ls -l REPORTES
+
+    - name: Generate data to cover.html
+      shell: bash
+      run: |
+        ACTOR='${{ github.actor }}'
+        DATE="$(date -u +'%Y-%m-%d %H:%M:%S UTC')"
+        REF_NAME='${{ github.ref_name }}'
+        SHA='${{ github.sha }}'
+        WORKFLOW='${{ github.workflow }}'
+        sed -i \
+            "s/__actor__/${ACTOR//\//\\/}/g; \
+             s/__date__/${DATE//\//\\/}/g; \
+             s/__ref_name__/${REF_NAME//\//\\/}/g; \
+             s/__sha__/${SHA//\//\\/}/g; \
+             s/__workflow__/${WORKFLOW//\//\\/}/g" \
+        REPORTES/cover.html
+
+    - name: Run migrations
       run: |
         uv run alembic upgrade head || echo "Alembic skipped"
-        uv run python -c "from app.db.config import create_db_and_tables; create_db_and_tables()"
+        uv run python -c "from app.db.seed import create_db_and_tables; create_db_and_tables()"
 
     - name: Seed database
-      run: uv run python -c "from app.db.config import seed_initial_data; seed_initial_data()"
-      
-    - name: Run tests
-      run: uv run pytest --maxfail=5 --tb=short
-      
-    - name: Check test coverage
-      run: uv run pytest --cov=app --cov-report=term-missing --cov-fail-under=85
+      run: uv run python -c "from app.db.seed import seed_initial_data; seed_initial_data()"
+
+    - name: Run tests with reports and coverage
+      continue-on-error: true
+      run: |
+        mkdir -p REPORTES
+        uv run pytest \
+          --maxfail=5 \
+          --tb=short \
+          --junitxml=REPORTES/junit.xml \
+          --html=REPORTES/pytest_report.html \
+          --css=REPORTES/pytest.css \
+          --self-contained-html \
+          --cov=app \
+          --cov-report=term-missing \
+          --cov-report=xml:REPORTES/coverage.xml \
+          --cov-report=html:REPORTES/coverage_html \
+          --cov-fail-under=85
+
+    - name: Create coverage wrapper HTML
+      if: always()
+      run: |
+        set -e
+        if [ -f REPORTES/coverage_html/index.html ]; then
+          if ! grep -q 'coverage.css' REPORTES/coverage_html/index.html; then
+            sed -i '0,/<head[^>]*>/s||\&\
+          <link rel="stylesheet" href="REPORTES/coverage.css">|' REPORTES/coverage_html/index.html
+            fi
+          fi
+
+    - name: Install PDF generation tools
+      if: always()
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y wkhtmltopdf poppler-utils
+
+    - name: Convert REPORTES to PDF and merge
+      if: always()
+      run: |
+        set -euo pipefail
+        command -v wkhtmltopdf >/dev/null 2>&1 || { echo "wkhtmltopdf no está instalado"; exit 1; }
+        command -v pdfunite >/dev/null 2>&1 || { echo "pdfunite no está instalado"; exit 1; }
+        
+        ls -la REPORTES || { echo "No existe REPORTES/"; exit 0; }
+        
+        pushd REPORTES >/dev/null
+        wkhtmltopdf --enable-local-file-access --print-media-type cover.html 00_cover.pdf || echo "cover.html -> PDF falló"
+        wkhtmltopdf --enable-local-file-access --print-media-type pytest_report.html 01_tests.pdf || echo "pytest_report.html -> PDF falló"
+        wkhtmltopdf --enable-local-file-access --print-media-type coverage_html/index.html 02_coverage.pdf || echo "coverage_html/index.html -> PDF falló"
+        ls -la
+        
+        PDFs=()
+        [ -f 00_cover.pdf ] && PDFs+=("00_cover.pdf")
+        [ -f 01_tests.pdf ] && PDFs+=("01_tests.pdf")
+        [ -f 02_coverage.pdf ] && PDFs+=("02_coverage.pdf")
+        
+        if [ ${#PDFs[@]} -gt 0 ]; then
+          echo "Uniendo PDFs: ${PDFs[*]}"
+          pdfunite "${PDFs[@]}" test_coverage_report.pdf
+          ls -la test_coverage_report.pdf || true
+        else
+          echo "No hay PDFs para unificar"
+        fi
+        
+        popd >/dev/null
+        ls -la REPORTES || true
+
+    - name: Upload test PDF artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: ${{ env.REPORT_ARTIFACT_NAME }}
+        path: |
+          REPORTES/test_coverage_report.pdf
+        if-no-files-found: warn
+        retention-days: 1

@@ -1,4 +1,5 @@
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
+from typing import List
 from app.models import Movie
 
 
@@ -7,3 +8,29 @@ class RecommendationResponse(BaseModel):
     score: float
 
     model_config = ConfigDict(from_attributes=True)
+
+
+class FriendResponse(BaseModel):
+    """Respuesta para información de un amigo."""
+    id: int
+    nombre: str
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class GroupRecommendationRequest(BaseModel):
+    """Request body para recomendaciones grupales."""
+    user_ids: List[int] = Field(
+        default=None,
+        min_length=2,
+        max_length=10,
+        description="Lista de IDs de usuarios del grupo (mínimo 2, máximo 10)"
+    )
+    
+    @field_validator('user_ids')
+    @classmethod
+    def validate_user_ids(cls, v: List[int]) -> List[int]:
+        """Validar que no haya IDs duplicados en user_ids."""
+        if v is not None and len(v) != len(set(v)):
+            raise ValueError("Los IDs de usuario no pueden estar duplicados")
+        return v
