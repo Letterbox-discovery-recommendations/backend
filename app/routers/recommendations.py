@@ -4,7 +4,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlmodel import Session, select
 
 from app.db.utils import get_session
-from app.models import RecommendationResponse, GroupRecommendationRequest, Follow
+from app.models import RecommendationResponse, GroupRecommendationRequest, Follow, User
 from app.security import get_current_user, TokenPayload
 from app.services import Recommendations
 
@@ -64,7 +64,7 @@ async def get_similar_movies(
 
 
 
-@router.get("/friends", response_model=List[int])
+@router.get("/friends", response_model=List[User])
 async def get_friends(
     db_session: Session = Depends(get_session),
     current_user: TokenPayload = Depends(get_current_user),

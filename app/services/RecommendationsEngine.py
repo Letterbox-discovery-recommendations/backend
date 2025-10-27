@@ -1,9 +1,10 @@
+import logging
 from random import random
 from typing import List
 from sqlmodel import Session, select, func
 import numpy as np
 import pandas as pd
-from app.models import Movie, Review, Genre, Platform, Follow
+from app.models import Movie, Review, Genre, Platform, Follow, User
 from datetime import datetime, timedelta
 
 positive_rating_threshold = 4.0
@@ -473,7 +474,7 @@ class Recommendations:
         # Usar el método existente para generar recomendaciones grupales
         return self.get_group_recommendations(group_user_ids, 10)
 
-    def get_followed(self, user_id: int) -> List[int]:
+    def get_followed(self, user_id: int) -> List[User]:
         """
         Obtiene los seguidores mutuos (amigos) de un usuario.
         
@@ -502,5 +503,12 @@ class Recommendations:
         
         # Extraer los IDs únicos
         mutual_follower_ids = list(set(result))
+
+        mutual_follower_ids = [str(x) for x in mutual_follower_ids]
+        logging.info(mutual_follower_ids)
+        users_query = select(User).where(User.id.in_(mutual_follower_ids))
+
+        users_result = self.db_session.exec(users_query).all()
+
         
-        return mutual_follower_ids
+        return users_result
