@@ -8,8 +8,10 @@ from app.db.movie_utils import process_movie_data, update_movie_data, delete_mov
 from app.db.review_utils import process_review_created, process_review_updated, process_review_deleted
 from app.db.social_utils import process_follow_created, process_follow_deleted
 from app.db.user_utils import process_user_created, process_user_updated
+from app.models import Mensaje
 import os
 import logging
+
 
 logger = logging.getLogger(__name__)
 
@@ -96,9 +98,6 @@ class RabbitMQConsumer:
         process_user_updated(session, body_data)
         logger.info("Usuario actualizado exitosamente.")
 
-
-
-
     def generic_event_callback(self, ch, method, properties, body):
         routing_key = method.routing_key
         delivery_tag = method.delivery_tag
@@ -110,30 +109,61 @@ class RabbitMQConsumer:
 
         if not handler:
             logger.warning(
-                f"No se encontró un manejador para la routing key '{routing_key}'. Descartando mensaje."
+                f"No se encontró un manejador para la routing key '{routing_key}'. Descartando."
             )
             ch.basic_ack(delivery_tag=delivery_tag)
             return
 
+        # 1. Validar el formato JSON primero
         try:
             body_data = json.loads(body.decode("utf-8"))
             logger.info(body_data)
+        except json.JSONDecodeError as e:
+            logger.error(
+                f"Error de formato JSON: {e}. El mensaje no es válido. Descartando."
+            )
+            ch.basic_nack(delivery_tag=delivery_tag, requeue=False)
+            return
 
-            with Session(self.engine) as session:
-                handler(session, body_data["data"])
-                session.commit()
+        # 2. Transacción de Auditoría: Guardar el log
+        try:
+            with Session(self.engine) as session_log:
+                mensaje_log = Mensaje(
+                    evento=routing_key,
+                    tipo="CONSUME",
+                    data=body_data,
+                )
+                session_log.add(mensaje_log)
+                session_log.commit()  # <-- Commit SÓLO para el log
 
+            logger.info("Mensaje de auditoría guardado exitosamente.")
+
+        except Exception as e:
+            # Si falla el guardado del log, la BD está mal.
+            # Hacemos NACK y no continuamos con el handler.
+            logger.error(f"Error CRÍTICO al guardar log de auditoría: {e}")
+            ch.basic_nack(delivery_tag=delivery_tag, requeue=False)
+            return
+
+        # 3. Transacción de Negocio: Procesar el mensaje
+        try:
+            with Session(self.engine) as session_data:
+                # El handler ahora se ejecuta en su PROPIA sesión
+                handler(session_data, body_data["data"])
+                session_data.commit()  # <-- Commit SÓLO para la lógica de negocio
+
+            # Si llegamos aquí, AMBAS transacciones fueron exitosas.
             ch.basic_ack(delivery_tag=delivery_tag)
             logger.info(
                 f"Mensaje con routing key '{routing_key}' procesado y confirmado (ACK)."
             )
 
-        except json.JSONDecodeError as e:
-            logger.error(f"Error de formato JSON: {e}. El mensaje no es válido. Descartando.")
-            ch.basic_nack(delivery_tag=delivery_tag, requeue=False)
         except Exception as e:
+            # ESTE ES TU CASO: El handler falló (error de validación, etc.)
+            # El log ya está guardado (Paso 2).
+            # Ahora solo logueamos el error y hacemos NACK.
             logger.error(
-                f"Error inesperado procesando mensaje con routing key '{routing_key}': {e}"
+                f"Error al PROCESAR mensaje (log ya guardado) con routing key '{routing_key}': {e}"
             )
             ch.basic_nack(delivery_tag=delivery_tag, requeue=False)
 

@@ -1,10 +1,9 @@
 from typing import List
 
 from fastapi import APIRouter, Depends, HTTPException
-from sqlmodel import Session, select
-
+from sqlmodel import Session
 from app.db.utils import get_session
-from app.models import RecommendationResponse, GroupRecommendationRequest, Follow, User
+from app.models import RecommendationResponse, GroupRecommendationRequest, User
 from app.security import get_current_user, TokenPayload
 from app.services import Recommendations
 
