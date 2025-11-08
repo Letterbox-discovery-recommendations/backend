@@ -9,6 +9,7 @@ from .links import CastLink, MovieGenreLink, MoviePlatformLink
 from .director import Director
 from .follow import Follow
 from .user import User
+from .mensajes import Mensaje
 
 __all__ = [
     "Movie",
@@ -24,5 +25,6 @@ __all__ = [
     "Platform",
     "Director",
     "Follow",
-    "User"
+    "User",
+    "Mensaje"
 ]

@@ -22,7 +22,7 @@ logging.basicConfig(
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     create_db_and_tables()
-    seed_initial_data()
+    #seed_initial_data()
     consumer_thread = threading.Thread(target=start_consuming)
     consumer_thread.daemon = True
     consumer_thread.start()
