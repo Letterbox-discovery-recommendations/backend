@@ -42,22 +42,20 @@ class RabbitMQConsumer:
             "usuarios.usuario.actualizado": self.handle_user_updated,
         }
 
-    # --- HANDLERS (Ahora deben ser async) ---
     async def handle_movie_created(self, session: AsyncSession, body_data):
         logger.info(
             f"Procesando creación de película: '{body_data.get('titulo', 'N/A')}'"
         )
-        # await process_movie_data(session, body_data) # <--- DEBE SER AWAIT
-        process_movie_data(
+        await process_movie_data(
             session, body_data
-        )  # Temporal si aún no son async, pero bloqueará un poco.
+        )
         logger.info("Película creada exitosamente.")
 
     async def handle_movie_updated(self, session: AsyncSession, body_data):
         logger.info(
             f"Procesando actualización de película: '{body_data.get('titulo', 'N/A')}'"
         )
-        update_movie_data(
+        await update_movie_data(
             session, body_data
         )  # Idealmente: await update_movie_data(...)
         logger.info("Película actualizada exitosamente.")
@@ -65,30 +63,30 @@ class RabbitMQConsumer:
     async def handle_movie_deleted(self, session: AsyncSession, body_data):
         movie_id = body_data.get("id", "N/A")
         logger.info(f"Procesando eliminación de película ID: {movie_id}")
-        delete_movie_data(session, body_data)
+        await delete_movie_data(session, body_data)
         logger.info("Película eliminada exitosamente.")
 
     # ... (Repite el patrón 'async def' para el resto de handlers) ...
     async def handle_review_created(self, session: AsyncSession, body_data):
-        process_review_created(session, body_data)
+        await process_review_created(session, body_data)
 
     async def handle_review_updated(self, session: AsyncSession, body_data):
-        process_review_updated(session, body_data)
+        await process_review_updated(session, body_data)
 
     async def handle_review_deleted(self, session: AsyncSession, body_data):
-        process_review_deleted(session, body_data)
+        await process_review_deleted(session, body_data)
 
     async def handle_follow_created(self, session: AsyncSession, body_data):
-        process_follow_created(session, body_data)
+        await process_follow_created(session, body_data)
 
     async def handle_follow_deleted(self, session: AsyncSession, body_data):
-        process_follow_deleted(session, body_data)
+        await process_follow_deleted(session, body_data)
 
     async def handle_user_created(self, session: AsyncSession, body_data):
-        process_user_created(session, body_data)
+        await process_user_created(session, body_data)
 
     async def handle_user_updated(self, session: AsyncSession, body_data):
-        process_user_updated(session, body_data)
+        await process_user_updated(session, body_data)
 
     async def on_message(self, message: AbstractIncomingMessage):
         """
@@ -113,9 +111,6 @@ class RabbitMQConsumer:
                 # logger.debug(body_data) # Reduce el ruido en producción
             except json.JSONDecodeError as e:
                 logger.error(f"Error JSON: {e}. Descartando mensaje.")
-                # Al no lanzar excepción dentro de 'message.process', se hace ACK automático.
-                # Si quieres NACK sin reencolar, tendrías que hacerlo manualmente,
-                # pero 'message.process' suele ser suficiente si solo quieres descartar.
                 return
 
                 # 2. Transacción de Auditoría (Log)
@@ -131,20 +126,16 @@ class RabbitMQConsumer:
                 logger.info("Log de auditoría guardado (async).")
             except Exception as e:
                 logger.critical(f"Fallo CRÍTICO al guardar log de auditoría: {e}")
-                # Si falla la auditoría, ¿queremos procesar el mensaje?
-                # Tu código original hacía NACK. Lanzar excepción aquí provocará un NACK/Requeue
-                # dependiendo de la configuración de 'message.process'.
+
                 raise e
 
-                # 3. Transacción de Negocio
+
             try:
                 async with AsyncSessionLocal() as session_data:
                     # Llamamos al handler (que ahora debe ser async)
                     if asyncio.iscoroutinefunction(handler):
                         await handler(session_data, body_data["data"])
                     else:
-                        # FALLBACK TEMPORAL: Si tus handlers siguen siendo sincrónicos,
-                        # esto evitará que bloqueen COMPLETAMENTE el loop, pero no es ideal.
                         logger.warning(
                             f"⚠️ Ejecutando handler SINCRONO para {routing_key}. Actualízalo a 'async def'."
                         )
@@ -161,7 +152,7 @@ class RabbitMQConsumer:
                 raise e
 
     async def run(self, queue_name: str):
-        logger.info(f"Conectando a RabbitMQ (Async)...")
+        logger.info("Conectando a RabbitMQ (Async)...")
         connection = await aio_pika.connect_robust(self.rabbitmq_url)
 
         async with connection:
