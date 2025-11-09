@@ -7,6 +7,7 @@ import numpy as np
 import pandas as pd
 from app.models import Movie, Review, Genre, Platform, Follow, User
 from datetime import datetime, timedelta
+from sqlalchemy.orm import selectinload
 
 # --- Constantes (sin cambios) ---
 positive_rating_threshold = 4.0
@@ -254,14 +255,24 @@ class Recommendations:
         self, reference_movie_id: int, limit: int = 10
     ):  # NUEVO: async def
         # NUEVO: await
-        ref_movie = await self.db_session.get(Movie, reference_movie_id)
+        ref_movie_query = (
+            select(Movie)
+            .where(Movie.id == reference_movie_id)
+            .options(selectinload(Movie.generos))  # <-- Carga ansiosa de géneros
+        )
+        ref_movie_result = await self.db_session.exec(ref_movie_query)
+        ref_movie = ref_movie_result.first()
+
         if not ref_movie:
             raise ValueError(f"Película {reference_movie_id} no encontrada")
 
         # NUEVO: await
-        all_movies_result = await self.db_session.exec(
-            select(Movie).where(Movie.activa == True)
+        all_movies_query = (
+            select(Movie)
+            .where(Movie.activa == True)
+            .options(selectinload(Movie.generos))  # <-- Carga ansiosa de géneros
         )
+        all_movies_result = await self.db_session.exec(all_movies_query)
         all_movies = all_movies_result.all()
 
         # Esta parte es CPU-bound pero rápida (bucles internos simples)
