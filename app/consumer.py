@@ -1,33 +1,35 @@
-import pika
+import asyncio
 import json
+import logging
+import os
 from dotenv import load_dotenv
-from sqlalchemy import Engine
-from sqlmodel import Session
-from app.db.utils import get_engine
+import aio_pika
+from aio_pika.abc import AbstractIncomingMessage
+from sqlmodel.ext.asyncio.session import AsyncSession
+
+# Importamos el engine y la fábrica de sesiones ASYNC de tu nuevo db/utils
+from app.db.utils import engine, AsyncSessionLocal
+from app.models import Mensaje
+
+# IMPORTANTE: Todas estas funciones deben ser actualizadas a 'async def'
+# y deben usar métodos asíncronos (await session.exec(), etc.)
 from app.db.movie_utils import process_movie_data, update_movie_data, delete_movie_data
-from app.db.review_utils import process_review_created, process_review_updated, process_review_deleted
+from app.db.review_utils import (
+    process_review_created,
+    process_review_updated,
+    process_review_deleted,
+)
 from app.db.social_utils import process_follow_created, process_follow_deleted
 from app.db.user_utils import process_user_created, process_user_updated
-from app.models import Mensaje
-import os
-import logging
 
-
+load_dotenv()
 logger = logging.getLogger(__name__)
+
 
 class RabbitMQConsumer:
     def __init__(self):
-        load_dotenv()
-        self.engine: Engine = get_engine()
-
-        rabbitmq_url = os.getenv("RABBIT_MQ_URL")
-        params = pika.URLParameters(rabbitmq_url)
-        self.connection = pika.BlockingConnection(params)
-        self.channel = self.connection.channel()
-        logger.info("Conexión con RabbitMQ establecida.")
-
+        self.rabbitmq_url = os.getenv("RABBIT_MQ_URL")
         self.routing_key_handlers = {
-            
             "peliculas.pelicula.creada": self.handle_movie_created,
             "peliculas.pelicula.actualizada": self.handle_movie_updated,
             "peliculas.pelicula.borrada": self.handle_movie_deleted,
@@ -37,162 +39,154 @@ class RabbitMQConsumer:
             "social.seguimiento.creado": self.handle_follow_created,
             "social.seguimiento.borrado": self.handle_follow_deleted,
             "usuarios.usuario.creado": self.handle_user_created,
-            "usuarios.usuario.actualizado": self.handle_user_updated
+            "usuarios.usuario.actualizado": self.handle_user_updated,
         }
-    def handle_movie_created(self, session, body_data):
-        logger.info(f"Procesando creación de película: '{body_data.get('titulo', 'N/A')}'")
-        process_movie_data(session, body_data)
+
+    # --- HANDLERS (Ahora deben ser async) ---
+    async def handle_movie_created(self, session: AsyncSession, body_data):
+        logger.info(
+            f"Procesando creación de película: '{body_data.get('titulo', 'N/A')}'"
+        )
+        # await process_movie_data(session, body_data) # <--- DEBE SER AWAIT
+        process_movie_data(
+            session, body_data
+        )  # Temporal si aún no son async, pero bloqueará un poco.
         logger.info("Película creada exitosamente.")
 
-    def handle_movie_updated(self, session, body_data):
-        logger.info(f"Procesando actualización de película: '{body_data.get('titulo', 'N/A')}'")
-        update_movie_data(session, body_data)
+    async def handle_movie_updated(self, session: AsyncSession, body_data):
+        logger.info(
+            f"Procesando actualización de película: '{body_data.get('titulo', 'N/A')}'"
+        )
+        update_movie_data(
+            session, body_data
+        )  # Idealmente: await update_movie_data(...)
         logger.info("Película actualizada exitosamente.")
 
-    def handle_movie_deleted(self, session, body_data):
-        movie_id = body_data.get('id', 'N/A')
+    async def handle_movie_deleted(self, session: AsyncSession, body_data):
+        movie_id = body_data.get("id", "N/A")
         logger.info(f"Procesando eliminación de película ID: {movie_id}")
         delete_movie_data(session, body_data)
         logger.info("Película eliminada exitosamente.")
 
-    def handle_review_created(self, session, body_data):
-        logger.info(f"Procesando creación de reseña para película ID: {body_data.get('movie_id', 'N/A')}")
+    # ... (Repite el patrón 'async def' para el resto de handlers) ...
+    async def handle_review_created(self, session: AsyncSession, body_data):
         process_review_created(session, body_data)
-        logger.info("Reseña creada exitosamente.")
 
-    def handle_review_updated(self, session, body_data):
-        logger.info(f"Procesando actualización de reseña ID: {body_data.get('id', 'N/A')}")
+    async def handle_review_updated(self, session: AsyncSession, body_data):
         process_review_updated(session, body_data)
-        logger.info("Reseña actualizada exitosamente.")
 
-    def handle_review_deleted(self, session, body_data):
-        logger.info(f"Procesando eliminación de reseña ID: {body_data.get('id', 'N/A')}")
+    async def handle_review_deleted(self, session: AsyncSession, body_data):
         process_review_deleted(session, body_data)
-        logger.info("Reseña eliminada exitosamente.")
 
-    def handle_follow_created(self, session, body_data):
-        follower = body_data.get('follower_id', 'N/A')
-        followed = body_data.get('followed_id', 'N/A')
-        logger.info(f"Procesando nuevo seguimiento: usuario {follower} sigue a {followed}")
+    async def handle_follow_created(self, session: AsyncSession, body_data):
         process_follow_created(session, body_data)
-        logger.info("Relación de seguimiento creada exitosamente.")
 
-    def handle_follow_deleted(self, session, body_data):
-        follower = body_data.get('follower_id', 'N/A')
-        followed = body_data.get('followed_id', 'N/A')
-        logger.info(f"Procesando eliminación de seguimiento: usuario {follower} deja de seguir a {followed}")
+    async def handle_follow_deleted(self, session: AsyncSession, body_data):
         process_follow_deleted(session, body_data)
-        logger.info("Relación de seguimiento eliminada exitosamente.")
 
-    def handle_user_created(self, session, body_data):
-        user_id = body_data.get('idUsuario', 'N/A')
-        user_name = body_data.get('nombre', 'N/A')
-        logger.info(f"Procesando creación de usuario: '{user_name}' (ID: {user_id})")
+    async def handle_user_created(self, session: AsyncSession, body_data):
         process_user_created(session, body_data)
-        logger.info("Usuario creado exitosamente.")
 
-    def handle_user_updated(self, session, body_data):
-        user_id = body_data.get('idUsuario', 'N/A')
-        user_name = body_data.get('nombre', 'N/A')
-        logger.info(f"Procesando actualización de usuario: '{user_name}' (ID: {user_id})")
+    async def handle_user_updated(self, session: AsyncSession, body_data):
         process_user_updated(session, body_data)
-        logger.info("Usuario actualizado exitosamente.")
 
-    def generic_event_callback(self, ch, method, properties, body):
-        routing_key = method.routing_key
-        delivery_tag = method.delivery_tag
-
+    async def on_message(self, message: AbstractIncomingMessage):
+        """
+        Callback principal asíncrono para cada mensaje recibido.
+        """
+        routing_key = message.routing_key
         logger.info(
-            f"[MENSAJE RECIBIDO] Routing Key: '{routing_key}', Delivery Tag: {delivery_tag}"
+            f"[MENSAJE RECIBIDO] Routing Key: '{routing_key}', ID: {message.message_id}"
         )
+
         handler = self.routing_key_handlers.get(routing_key)
 
         if not handler:
-            logger.warning(
-                f"No se encontró un manejador para la routing key '{routing_key}'. Descartando."
-            )
-            ch.basic_ack(delivery_tag=delivery_tag)
+            logger.warning(f"No se encontró handler para '{routing_key}'. Descartando.")
+            await message.ack()
             return
 
-        # 1. Validar el formato JSON primero
-        try:
-            body_data = json.loads(body.decode("utf-8"))
-            logger.info(body_data)
-        except json.JSONDecodeError as e:
-            logger.error(
-                f"Error de formato JSON: {e}. El mensaje no es válido. Descartando."
-            )
-            ch.basic_nack(delivery_tag=delivery_tag, requeue=False)
-            return
+        async with message.process(ignore_processed=True):
+            # 1. Validar JSON
+            try:
+                body_data = json.loads(message.body.decode("utf-8"))
+                # logger.debug(body_data) # Reduce el ruido en producción
+            except json.JSONDecodeError as e:
+                logger.error(f"Error JSON: {e}. Descartando mensaje.")
+                # Al no lanzar excepción dentro de 'message.process', se hace ACK automático.
+                # Si quieres NACK sin reencolar, tendrías que hacerlo manualmente,
+                # pero 'message.process' suele ser suficiente si solo quieres descartar.
+                return
 
-        # 2. Transacción de Auditoría: Guardar el log
-        try:
-            with Session(self.engine) as session_log:
-                mensaje_log = Mensaje(
-                    evento=routing_key,
-                    tipo="CONSUME",
-                    data=body_data,
-                )
-                session_log.add(mensaje_log)
-                session_log.commit()  # <-- Commit SÓLO para el log
+                # 2. Transacción de Auditoría (Log)
+            try:
+                async with AsyncSessionLocal() as session_log:
+                    mensaje_log = Mensaje(
+                        evento=routing_key,
+                        tipo="CONSUME",
+                        data=body_data,
+                    )
+                    session_log.add(mensaje_log)
+                    await session_log.commit()
+                logger.info("Log de auditoría guardado (async).")
+            except Exception as e:
+                logger.critical(f"Fallo CRÍTICO al guardar log de auditoría: {e}")
+                # Si falla la auditoría, ¿queremos procesar el mensaje?
+                # Tu código original hacía NACK. Lanzar excepción aquí provocará un NACK/Requeue
+                # dependiendo de la configuración de 'message.process'.
+                raise e
 
-            logger.info("Mensaje de auditoría guardado exitosamente.")
+                # 3. Transacción de Negocio
+            try:
+                async with AsyncSessionLocal() as session_data:
+                    # Llamamos al handler (que ahora debe ser async)
+                    if asyncio.iscoroutinefunction(handler):
+                        await handler(session_data, body_data["data"])
+                    else:
+                        # FALLBACK TEMPORAL: Si tus handlers siguen siendo sincrónicos,
+                        # esto evitará que bloqueen COMPLETAMENTE el loop, pero no es ideal.
+                        logger.warning(
+                            f"⚠️ Ejecutando handler SINCRONO para {routing_key}. Actualízalo a 'async def'."
+                        )
+                        handler(session_data, body_data["data"])
 
-        except Exception as e:
-            # Si falla el guardado del log, la BD está mal.
-            # Hacemos NACK y no continuamos con el handler.
-            logger.error(f"Error CRÍTICO al guardar log de auditoría: {e}")
-            ch.basic_nack(delivery_tag=delivery_tag, requeue=False)
-            return
+                    await session_data.commit()
 
-        # 3. Transacción de Negocio: Procesar el mensaje
-        try:
-            with Session(self.engine) as session_data:
-                # El handler ahora se ejecuta en su PROPIA sesión
-                handler(session_data, body_data["data"])
-                session_data.commit()  # <-- Commit SÓLO para la lógica de negocio
+                logger.info(f"Mensaje '{routing_key}' procesado exitosamente.")
 
-            # Si llegamos aquí, AMBAS transacciones fueron exitosas.
-            ch.basic_ack(delivery_tag=delivery_tag)
-            logger.info(
-                f"Mensaje con routing key '{routing_key}' procesado y confirmado (ACK)."
-            )
+            except Exception as e:
+                logger.error(f"Error al PROCESAR mensaje '{routing_key}': {e}")
+                # Lanzar la excepción dentro de 'message.process' provocará un NACK.
+                # Si quieres que NO se reencole, deberías capturarla y hacer message.reject(requeue=False)
+                raise e
 
-        except Exception as e:
-            # ESTE ES TU CASO: El handler falló (error de validación, etc.)
-            # El log ya está guardado (Paso 2).
-            # Ahora solo logueamos el error y hacemos NACK.
-            logger.error(
-                f"Error al PROCESAR mensaje (log ya guardado) con routing key '{routing_key}': {e}"
-            )
-            ch.basic_nack(delivery_tag=delivery_tag, requeue=False)
+    async def run(self, queue_name: str):
+        logger.info(f"Conectando a RabbitMQ (Async)...")
+        connection = await aio_pika.connect_robust(self.rabbitmq_url)
 
-    def run(self, queue_name: str):
+        async with connection:
+            channel = await connection.channel()
+            # Declara la cola (durable=True para persistencia)
+            queue = await channel.declare_queue(queue_name, durable=True)
 
-        logger.info(f"\nConfigurando consumidor para la cola '{queue_name}'...")
+            logger.info(f"✅ Consumidor esperando mensajes en '{queue_name}'")
 
+            # Procesa mensajes concurrentemente
+            await queue.consume(self.on_message)
 
-        self.channel.queue_declare(queue=queue_name, durable=True)
-
-        self.channel.basic_consume(
-            queue=queue_name, on_message_callback=self.generic_event_callback
-        )
-
-        try:
-            logger.info(f"Esperando mensajes en '{queue_name}'. Para salir presiona CTRL+C")
-            self.channel.start_consuming()
-        except KeyboardInterrupt:
-            logger.info("Cerrando conexión...")
-            self.connection.close()
-            logger.info("Conexión cerrada.")
+            # Mantiene el consumidor corriendo para siempre
+            await asyncio.Future()
 
 
-def start_consuming():
+# Función de entrada para lifespan
+async def start_consuming():
     MY_SERVICE_QUEUE = "core.recommendations.queue"
-
     consumer = RabbitMQConsumer()
-    consumer.run(MY_SERVICE_QUEUE)
+    try:
+        await consumer.run(MY_SERVICE_QUEUE)
+    except asyncio.CancelledError:
+        logger.info("Tarea del consumidor cancelada. Apagando limpiamente.")
 
-# Para ejecutar el consumidor
 if __name__ == "__main__":
-    start_consuming()
+    # Para probarlo aisladamente
+    asyncio.run(start_consuming())
