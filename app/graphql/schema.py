@@ -1,10 +1,12 @@
 import strawberry
 from typing import List, Optional
+
+from sqlalchemy.ext.asyncio import AsyncSession
 from sqlmodel import Session, select
 from sqlalchemy import func  # noqa: F401
 from sqlalchemy.orm import selectinload
 from datetime import date
-
+from strawberry.dataloader import DataLoader
 # Importa los nuevos modelos de la base de datos
 from app.db.utils import get_session
 from app.models import (
@@ -13,10 +15,9 @@ from app.models import (
     Platform as DBPlatform,  # noqa: F401
     CastLink as DBCastLink,
     Genre as DBGenre,
-    Review as DBReview,  
-    MovieGenreLink,
-    MoviePlatformLink,
+    Review as DBReview,
 )
+from strawberry.types import Info
 
 
 @strawberry.type
@@ -81,16 +82,15 @@ class MovieType:
     def director(self) -> Optional[RealPersonType]:
         """El director de la película."""
         return self.director  # type: ignore
-    
+
     @strawberry.field
-    def ratingPelicula(self) -> Optional[float]:
-        """El rating promedio de la película basado en reseñas."""
-        db_session: Session = next(get_session())
-        avg_rating = db_session.exec(
-            select(func.avg(DBReview.rating)).where(DBReview.movie_id == self.id)
-        ).first()
-        db_session.close()
-        return avg_rating if avg_rating is not None else None  # Devuelve None si no hay reseñas
+    async def ratingPelicula(self, info: Info) -> Optional[float]:
+        """El rating promedio de la película (cargado eficientemente)."""
+
+        # 1. Obtiene el loader del contexto
+        loader = info.context["rating_loader"]
+
+        return await loader.load(self.id)
 
     @strawberry.field
     def generos(self) -> List[GenreType]:

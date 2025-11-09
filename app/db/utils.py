@@ -1,29 +1,72 @@
 import os
-
 from dotenv import load_dotenv
-from sqlmodel import create_engine, Session, select
+from sqlalchemy.ext.asyncio import AsyncEngine, create_async_engine
+from sqlmodel import select
+from sqlmodel.ext.asyncio.session import (
+    AsyncSession,
+)
 
+
+
+from sqlalchemy.orm import sessionmaker
+from typing import AsyncGenerator
 
 load_dotenv()
-DATABASE_URL = f"postgresql://{os.getenv('DB_USER')}:{os.getenv('DB_PASSWORD')}@{os.getenv('DB_HOST')}/{os.getenv('DB_NAME')}"
-engine = create_engine(DATABASE_URL, pool_pre_ping=True)
 
-def get_engine():
+# --- 1. CONSTRUYE LA URL ASÍNCRONA ---
+# ¡Observa el "postgresql+asyncpg"!
+ASYNC_DATABASE_URL = (
+    f"postgresql+asyncpg://{os.getenv('DB_USER')}:{os.getenv('DB_PASSWORD')}"
+    f"@{os.getenv('DB_HOST')}/{os.getenv('DB_NAME')}"
+)
+
+# --- 2. CREA EL ENGINE ASÍNCRONO ---
+# Este es el 'engine' que buscabas.
+# Se crea una sola vez cuando la app inicia.
+engine: AsyncEngine = create_async_engine(ASYNC_DATABASE_URL, pool_pre_ping=True)
+
+
+AsyncSessionLocal = sessionmaker(
+    bind=engine,
+    class_=AsyncSession,
+    expire_on_commit=False,
+)
+
+
+
+async def get_session() -> AsyncGenerator[AsyncSession, None]:
+    """
+    Dependencia de FastAPI para obtener una sesión de DB asíncrona.
+    Maneja automáticamente el 'commit' y 'rollback'.
+    """
+    async with AsyncSessionLocal() as session:
+        try:
+            yield session
+            await session.commit()
+        except Exception:
+            await session.rollback()
+            raise
+        finally:
+            await session.close()
+
+
+def get_engine() -> AsyncEngine:
+    """Retorna la instancia del engine asíncrono."""
     return engine
 
 
-def get_session():
-    with Session(engine) as session:
-        yield session
-
-
-def get_or_create(session: Session, model, **kwargs):
+# --- 5. TU FUNCIÓN HELPER 'get_or_create' (VERSIÓN ASYNC) ---
+async def get_or_create_async(session: AsyncSession, model, **kwargs):
     """
-    Busca una instancia. Si no existe, la crea y la AÑADE a la sesión actual,
-    pero NO hace commit. El commit se hará fuera de esta función.
+    Versión asíncrona de get_or_create.
+    Busca una instancia. Si no existe, la crea y la AÑADE a la sesión.
+    NO hace commit.
     """
     defaults = kwargs.pop("defaults", {})
-    instance = session.exec(select(model).filter_by(**kwargs)).first()
+
+    # Usa 'await' para la ejecución de la query
+    result = await session.exec(select(model).filter_by(**kwargs))
+    instance = result.first()
 
     if instance:
         return instance
@@ -31,4 +74,5 @@ def get_or_create(session: Session, model, **kwargs):
         instance_data = {**kwargs, **defaults}
         instance = model(**instance_data)
         session.add(instance)
+        # No necesitas 'await' para 'session.add'
         return instance
