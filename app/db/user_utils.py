@@ -1,16 +1,18 @@
 from sqlmodel import select
-from sqlmodel.ext.asyncio.session import AsyncSession  # NUEVO: AsyncSession
+from sqlmodel.ext.asyncio.session import AsyncSession
 from app.models import User
 import logging
 from datetime import datetime
 
+# NUEVO: Importar 'insert' de PostgreSQL
+from sqlalchemy.dialects.postgresql import insert
+
 logger = logging.getLogger(__name__)
 
 
-# NUEVO: 'async def' y 'AsyncSession'
 async def process_user_created(session: AsyncSession, user_data: dict):
     """
-    Procesa la creación de un nuevo usuario. (Async)
+    Procesa la creación (o actualización) de un nuevo usuario de forma atómica (UPSERT).
     IMPORTANTE: Esta función NO hace commit. El commit se debe manejar fuera.
     """
     try:
@@ -22,74 +24,78 @@ async def process_user_created(session: AsyncSession, user_data: dict):
                     f"Campo requerido '{field}' no encontrado en los datos de usuario"
                 )
 
-        # Verificar que no exista ya el usuario
-        # NUEVO: 'await' y paréntesis en session.exec()
-        existing_user_result = await session.exec(
-            select(User).where(User.id == user_data["idUsuario"])
-        )
-        existing_user = existing_user_result.first()
-
-        if existing_user:
-            logger.warning(
-                f"El usuario {user_data['idUsuario']} ya existe. Actualizando datos..."
-            )
-            # Actualizar campos existentes (esto no es I/O)
-            existing_user.name = user_data["nombre"]
-            existing_user.country = user_data["pais"]
-            if isinstance(user_data["fechaRegistro"], str):
-                existing_user.registration_date = datetime.fromisoformat(
-                    user_data["fechaRegistro"]
-                ).date()
-            else:
-                existing_user.registration_date = user_data["fechaRegistro"]
-
-            session.add(existing_user)  # Añadir para que el commit lo guarde
-            return
-
-        # Crear el usuario
-        db_user = User(
-            id=user_data["idUsuario"],
-            name=user_data["nombre"],
-            country=user_data["pais"],
-            registration_date=datetime.fromisoformat(user_data["fechaRegistro"]).date()
+        # 1. Preparar los datos
+        registration_date = (
+            datetime.fromisoformat(user_data["fechaRegistro"]).date()
             if isinstance(user_data["fechaRegistro"], str)
-            else user_data["fechaRegistro"],
+            else user_data["fechaRegistro"]
         )
-        session.add(db_user)  # .add() no es async
-        logger.info(f"Usuario creado: {db_user.name} (ID: {db_user.id})")
+
+        user_values = {
+            "id": user_data["idUsuario"],
+            "name": user_data["nombre"],
+            "country": user_data["pais"],
+            "registration_date": registration_date,
+        }
+
+        # 2. Crear el statement 'INSERT ... ON CONFLICT DO UPDATE'
+        insert_stmt = (
+            insert(User)
+            .values(**user_values)
+            .on_conflict_do_update(
+                index_elements=["id"],  # Conflicto detectado en la Primary Key 'id'
+                set_={
+                    # Si ya existe, actualiza estos campos
+                    "name": user_values["name"],
+                    "country": user_values["country"],
+                    "registration_date": user_values["registration_date"],
+                },
+            )
+        )
+
+        # 3. Ejecutar atómicamente
+        await session.execute(insert_stmt)
+
+        logger.info(
+            f"Usuario creado/actualizado (UPSERT): {user_values['name']} (ID: {user_values['id']})"
+        )
     except Exception as e:
-        logger.error(f"Error al crear usuario: {e}")
-        raise ValueError(f"Error al procesar usuario") from e
+        logger.error(f"Error al procesar usuario (UPSERT): {e}")
+        raise ValueError("Error al procesar usuario") from e
 
 
-# NUEVO: 'async def' y 'AsyncSession'
 async def process_user_updated(session: AsyncSession, user_data: dict):
     """
-    Procesa la actualización de un usuario existente. (Async)
+    Procesa la actualización de un usuario existente de forma segura.
     IMPORTANTE: Esta función NO hace commit. El commit se debe manejar fuera.
     """
     try:
-        # Validar campo requerido
         if "idUsuario" not in user_data:
             raise ValueError("Campo requerido 'idUsuario' no encontrado")
 
-        # Buscar usuario existente
-        # NUEVO: 'await' y paréntesis en session.exec()
-        user_result = await session.exec(
-            select(User).where(User.id == user_data["idUsuario"])
-        )
-        db_user = user_result.first()
+        user_id = user_data["idUsuario"]
+
+        # 1. Obtener y BLOQUEAR la fila del usuario para evitar 'race conditions' de updates
+        db_user = await session.get(User, user_id, with_for_update=True)
 
         if not db_user:
             logger.warning(
-                f"Usuario {user_data['idUsuario']} no encontrado. Creando nuevo usuario..."
+                f"Usuario {user_id} no encontrado para actualizar. Se intentará crear (UPSERT)..."
             )
-            # Si no existe, crear como nuevo
-            # NUEVO: 'await' en la llamada recursiva
+            # Si no existe, delega a la función 'crear' (que es atómica)
+            # Necesitamos asegurar que todos los campos requeridos estén presentes
+            if not all(k in user_data for k in ["nombre", "pais", "fechaRegistro"]):
+                logger.error(
+                    f"Faltan datos para crear usuario {user_id} desde un evento 'update'"
+                )
+                raise ValueError(
+                    "Datos insuficientes para crear usuario desde un 'update'"
+                )
+
             await process_user_created(session, user_data)
             return
 
-        # Actualizar campos proporcionados (esto no es I/O)
+        # 2. Actualizar campos proporcionados (ahora es seguro, tenemos el bloqueo)
         if "nombre" in user_data:
             db_user.name = user_data["nombre"]
         if "pais" in user_data:
@@ -101,8 +107,9 @@ async def process_user_updated(session: AsyncSession, user_data: dict):
                 else user_data["fechaRegistro"]
             )
 
-        session.add(db_user)  # Añadir para que el commit lo guarde
+        session.add(db_user)  # SQLModel sabe que esto es un UPDATE
         logger.info(f"Usuario actualizado: {db_user.name} (ID: {db_user.id})")
+
     except Exception as e:
         logger.error(f"Error al actualizar usuario: {e}")
-        raise ValueError(f"Error al actualizar usuario") from e
+        raise ValueError("Error al actualizar usuario") from e

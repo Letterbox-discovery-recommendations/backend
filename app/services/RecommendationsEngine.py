@@ -526,11 +526,13 @@ class Recommendations:
         result = await self.db_session.exec(mutual_followers_query)
 
         mutual_follower_ids = list(set(result.all())) # .all()
-        mutual_follower_ids = [str(x) for x in mutual_follower_ids]
+        mutual_follower_ids = [f"str(x)" for x in mutual_follower_ids]
         logging.info(mutual_follower_ids)
 
         if not mutual_follower_ids:
             return []
+
+
 
         users_query = select(User).where(User.id.in_(mutual_follower_ids))
         # NUEVO: await
