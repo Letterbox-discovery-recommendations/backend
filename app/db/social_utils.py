@@ -21,10 +21,12 @@ async def process_follow_created(session: AsyncSession, follow_data: dict):
             if field not in follow_data:
                 raise ValueError(f"Campo requerido '{field}' no encontrado")
 
+
+
         # 1. Preparar los datos
         follow_values = {
-            "follower_id": follow_data["actor_id"],
-            "followed_id": follow_data["target_id"],
+            "follower_id": str(follow_data["actor_id"]),
+            "followed_id": str(follow_data["target_id"]),
         }
 
         # 2. Crear el statement 'INSERT ... ON CONFLICT'

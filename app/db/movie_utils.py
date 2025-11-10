@@ -164,9 +164,18 @@ async def update_movie_data(session: AsyncSession, movie_data: dict):
     # 2. Get/create todas las entidades relacionadas (igual que 'crear')
     db_director = None
     if pydantic_movie.director:
+        director_defaults = {
+            "nombre": pydantic_movie.director.nombre,
+            "imagenUrl": pydantic_movie.director.imagen,
+            "genero": 0,
+        }
+
         db_director = await get_or_create_async(
-            ...
-        )  # (lógica de get_or_create_async para director)
+            session,
+            Director,
+            id=pydantic_movie.director.id,
+            defaults=director_defaults
+        )
 
     genre_tasks = [
         get_or_create_async(session, Genre, id=g.id, defaults=g.model_dump())
@@ -207,6 +216,9 @@ async def update_movie_data(session: AsyncSession, movie_data: dict):
 
     # 4. Actualizar relaciones (el método "borrar y recrear" es el más simple)
     #    Como tenemos la fila bloqueada, esto es seguro.
+
+
+    await session.refresh(db_movie, ["generos", "plataformas", "cast_links"])
 
     db_movie.generos = db_genres
     db_movie.plataformas = db_platforms

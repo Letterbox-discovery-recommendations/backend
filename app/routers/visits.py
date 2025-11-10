@@ -72,7 +72,7 @@ async def get_content_recommendations(
         "data": {
             "evento": "pelicula_visitada",
             "movie_id": visited_movie.movie_id,
-            "user_id": f"u{current_user.user_id}",
+            "user_id": current_user.user_id,
         },
     }
 
