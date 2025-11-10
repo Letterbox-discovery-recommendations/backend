@@ -111,7 +111,7 @@ class Query:
         # NUEVO: Obtener la sesión del contexto
         db: AsyncSession = info.context["db"]
 
-        statement = select(DBMovie).options(
+        statement = select(DBMovie).where(DBMovie.activa == True).options(
             selectinload(DBMovie.director),
             selectinload(DBMovie.generos),
             selectinload(DBMovie.plataformas),
@@ -227,7 +227,7 @@ class Query:
                 selectinload(DBMovie.plataformas),
                 selectinload(DBMovie.cast_links).selectinload(DBCastLink.person),
             )
-            .where(DBMovie.id == id)
+            .where(DBMovie.id == id, DBMovie.activa == True)
         )
 
         result = await db.exec(statement) # NUEVO: await

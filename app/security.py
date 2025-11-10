@@ -102,7 +102,6 @@ async def get_current_user(
 
 
         payload = jwt.decode(token, public_key, algorithms=["RS256"])
-        print(payload)
         token_data = TokenPayload(**payload)
         return token_data
 
