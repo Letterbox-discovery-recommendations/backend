@@ -1,11 +1,44 @@
 # tests/test_graphql_rating_and_sort.py
 from fastapi.testclient import TestClient
-from app.main import app
+from app.main import app, get_context
 from sqlmodel import SQLModel, create_engine, Session
 import pytest
 from app.models.movie import Movie
 from app.models.ratings import Review
 from app.models.genre import Genre
+
+
+
+class _DummyResult:
+    def __init__(self, rows=None):
+        self._rows = rows or []
+
+    def all(self):
+        return self._rows
+
+    def first(self):
+        return self._rows[0] if self._rows else None
+
+    def unique(self):
+        return self
+
+
+class _DummyDB:
+    async def exec(self, statement):
+        
+        return _DummyResult([])
+
+
+class _DummyRatingLoader:
+    async def load(self, movie_id):
+        return None
+
+
+async def _fake_get_context():
+    return {"db": _DummyDB(), "rating_loader": _DummyRatingLoader()}
+
+
+app.dependency_overrides[get_context] = _fake_get_context
 
 client = TestClient(app)
 
