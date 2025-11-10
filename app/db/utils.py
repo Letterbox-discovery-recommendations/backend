@@ -5,6 +5,7 @@ from sqlmodel import select
 from sqlmodel.ext.asyncio.session import (
     AsyncSession,
 )
+from sqlalchemy.dialects.postgresql import insert
 
 
 
@@ -17,13 +18,13 @@ load_dotenv()
 # ¡Observa el "postgresql+asyncpg"!
 ASYNC_DATABASE_URL = (
     f"postgresql+asyncpg://{os.getenv('DB_USER')}:{os.getenv('DB_PASSWORD')}"
-    f"@{os.getenv('DB_HOST')}/{os.getenv('DB_NAME')}"
+    f"@{os.getenv('DB_HOST')}:{os.getenv("DB_PORT")}/{os.getenv('DB_NAME')}"
 )
 
 # --- 2. CREA EL ENGINE ASÍNCRONO ---
 # Este es el 'engine' que buscabas.
 # Se crea una sola vez cuando la app inicia.
-engine: AsyncEngine = create_async_engine(ASYNC_DATABASE_URL, pool_pre_ping=True)
+engine: AsyncEngine = create_async_engine(ASYNC_DATABASE_URL, pool_pre_ping=True, pool_size=10, max_overflow=10)
 
 
 AsyncSessionLocal = sessionmaker(
@@ -55,24 +56,24 @@ def get_engine() -> AsyncEngine:
     return engine
 
 
-# --- 5. TU FUNCIÓN HELPER 'get_or_create' (VERSIÓN ASYNC) ---
 async def get_or_create_async(session: AsyncSession, model, **kwargs):
     """
-    Versión asíncrona de get_or_create.
-    Busca una instancia. Si no existe, la crea y la AÑADE a la sesión.
-    NO hace commit.
+    Versión asíncrona y atómica de get_or_create usando
+    'INSERT ... ON CONFLICT DO NOTHING'.
+    Previene race conditions.
     """
     defaults = kwargs.pop("defaults", {})
 
-    # Usa 'await' para la ejecución de la query
-    result = await session.exec(select(model).filter_by(**kwargs))
-    instance = result.first()
+    instance_data = {**kwargs, **defaults}
 
-    if instance:
-        return instance
-    else:
-        instance_data = {**kwargs, **defaults}
-        instance = model(**instance_data)
-        session.add(instance)
-        # No necesitas 'await' para 'session.add'
-        return instance
+    insert_stmt = (
+        insert(model)
+        .values(**instance_data)
+        .on_conflict_do_nothing(index_elements=["id"])  # Asume que 'id' es la PK
+    )
+
+    await session.execute(insert_stmt)
+
+    instance = await session.get(model, kwargs["id"])
+
+    return instance

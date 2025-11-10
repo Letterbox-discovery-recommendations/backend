@@ -65,7 +65,13 @@ class Recommendations:
 
     async def get_recommendations(self, user_id: int):  # NUEVO: async def
         # NUEVO: await
-        all_movies_result = await self.db_session.exec(select(Movie))
+        all_movies_query = (
+            select(Movie)
+            .where(Movie.activa == True)
+            .options(selectinload(Movie.generos))
+        )
+        all_movies_result = await self.db_session.exec(all_movies_query)
+
         all_movies = all_movies_result.all()
 
         # NUEVO: await en llamadas internas
@@ -101,6 +107,7 @@ class Recommendations:
             select(Movie, func.count(Review.id).label("recommendation_count"))
             .join(Review)
             .where(
+                Movie.activa == True,
                 Review.rating >= positive_rating_threshold,
                 Review.created_at >= one_month_ago,
             )
@@ -117,7 +124,7 @@ class Recommendations:
         query = (
             select(Movie, func.count(Review.id).label("rating_count"))
             .join(Review)
-            .where(Review.created_at >= one_week_ago)
+            .where(Movie.activa == True,Review.created_at >= one_week_ago)
             .group_by(Movie.id)
             .order_by(func.count(Review.id).desc())
             .limit(limit)
@@ -133,7 +140,7 @@ class Recommendations:
             select(Movie, func.avg(Review.rating).label("avg_rating"))
             .join(Review)
             .join(Movie.plataformas)
-            .where(Platform.id == platform_id)
+            .where(Movie.activa == True,Platform.id == platform_id)
             .group_by(Movie.id)
             .order_by(func.avg(Review.rating).desc())
             .limit(limit)
@@ -149,7 +156,7 @@ class Recommendations:
             select(Movie, func.avg(Review.rating).label("avg_rating"))
             .join(Review)
             .join(Movie.generos)
-            .where(Genre.id == genre_id)
+            .where(Movie.activa == True,Genre.id == genre_id)
             .group_by(Movie.id)
             .order_by(func.avg(Review.rating).desc())
             .limit(limit)
@@ -238,8 +245,7 @@ class Recommendations:
 
         # 3. Obtener objetos Movie de la DB (I/O)
         movies_result = await self.db_session.exec(
-            select(Movie).where(Movie.id.in_(movie_ids))
-        )
+            select(Movie).where(Movie.id.in_(movie_ids), Movie.activa == True))
         movies = movies_result.all()
         movie_dict = {m.id: m for m in movies}
 
@@ -360,7 +366,10 @@ class Recommendations:
 
         # 3. Content-based grupal
         # NUEVO: await
-        all_movies_result = await self.db_session.exec(select(Movie))
+        all_movies_query = select(Movie).where(Movie.activa == True).options(selectinload(Movie.generos))
+        all_movies_result = await self.db_session.exec(all_movies_query)
+
+
         all_movies = all_movies_result.all()
         # NUEVO: await
         movie_vectors = await self.get_movie_vectors(all_movies)
@@ -476,7 +485,7 @@ class Recommendations:
 
         # NUEVO: await
         movies_result = await self.db_session.exec(
-            select(Movie).where(Movie.id.in_(movie_ids))
+            select(Movie).where(Movie.id.in_(movie_ids), Movie.activa == True)
         )
         movies = movies_result.all()
         movie_dict = {m.id: m for m in movies}
@@ -515,11 +524,11 @@ class Recommendations:
 
     async def get_followed(self, user_id: int) -> List[User]:  # NUEVO: async def
         followers_subquery = select(Follow.follower_id).where(
-            Follow.followed_id == user_id
+            Follow.followed_id == str(user_id)
         )
 
         mutual_followers_query = select(Follow.followed_id).where(
-            Follow.follower_id == user_id, Follow.followed_id.in_(followers_subquery)
+            Follow.follower_id == str(user_id), Follow.followed_id.in_(followers_subquery)
         )
 
         # NUEVO: await
@@ -531,6 +540,8 @@ class Recommendations:
 
         if not mutual_follower_ids:
             return []
+
+
 
         users_query = select(User).where(User.id.in_(mutual_follower_ids))
         # NUEVO: await
