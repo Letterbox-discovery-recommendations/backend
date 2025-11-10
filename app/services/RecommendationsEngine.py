@@ -532,6 +532,8 @@ class Recommendations:
         if not mutual_follower_ids:
             return []
 
+
+
         users_query = select(User).where(User.id.in_(mutual_follower_ids))
         # NUEVO: await
         users_result = await self.db_session.exec(users_query)

@@ -30,19 +30,13 @@ logging.basicConfig(
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     await create_db_and_tables()
-    # TODO: Esta función también debe ser 'async' y usar 'await engine.run_sync(SQLModel.metadata.create_all)'
-    # De lo contrario, bloqueará el inicio de la app.
 
-    # 🚩 NO USES threading.Thread en una app async. Bloquea el event loop.
-    # consumer_thread = threading.Thread(target=start_consuming)
-    # consumer_thread.daemon = True
-    # consumer_thread.start()
 
-    # ✅ USA asyncio.create_task para tareas en segundo plano
+
     logging.info("Iniciando consumidor de RabbitMQ en segundo plano...")
     consumer_task = asyncio.create_task(
         start_consuming()
-    )  # Asume que start_consuming es 'async def'
+    )
 
     yield
 

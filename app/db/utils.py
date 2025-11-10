@@ -18,13 +18,13 @@ load_dotenv()
 # ¡Observa el "postgresql+asyncpg"!
 ASYNC_DATABASE_URL = (
     f"postgresql+asyncpg://{os.getenv('DB_USER')}:{os.getenv('DB_PASSWORD')}"
-    f"@{os.getenv('DB_HOST')}/{os.getenv('DB_NAME')}"
+    f"@{os.getenv('DB_HOST')}:{os.getenv("DB_PORT")}/{os.getenv('DB_NAME')}"
 )
 
 # --- 2. CREA EL ENGINE ASÍNCRONO ---
 # Este es el 'engine' que buscabas.
 # Se crea una sola vez cuando la app inicia.
-engine: AsyncEngine = create_async_engine(ASYNC_DATABASE_URL, pool_pre_ping=True)
+engine: AsyncEngine = create_async_engine(ASYNC_DATABASE_URL, pool_pre_ping=True, pool_size=10, max_overflow=10)
 
 
 AsyncSessionLocal = sessionmaker(
