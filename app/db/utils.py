@@ -5,6 +5,7 @@ from sqlmodel import select
 from sqlmodel.ext.asyncio.session import (
     AsyncSession,
 )
+from sqlalchemy.dialects.postgresql import insert
 
 
 
@@ -55,24 +56,24 @@ def get_engine() -> AsyncEngine:
     return engine
 
 
-# --- 5. TU FUNCIÓN HELPER 'get_or_create' (VERSIÓN ASYNC) ---
 async def get_or_create_async(session: AsyncSession, model, **kwargs):
     """
-    Versión asíncrona de get_or_create.
-    Busca una instancia. Si no existe, la crea y la AÑADE a la sesión.
-    NO hace commit.
+    Versión asíncrona y atómica de get_or_create usando
+    'INSERT ... ON CONFLICT DO NOTHING'.
+    Previene race conditions.
     """
     defaults = kwargs.pop("defaults", {})
 
-    # Usa 'await' para la ejecución de la query
-    result = await session.exec(select(model).filter_by(**kwargs))
-    instance = result.first()
+    instance_data = {**kwargs, **defaults}
 
-    if instance:
-        return instance
-    else:
-        instance_data = {**kwargs, **defaults}
-        instance = model(**instance_data)
-        session.add(instance)
-        # No necesitas 'await' para 'session.add'
-        return instance
+    insert_stmt = (
+        insert(model)
+        .values(**instance_data)
+        .on_conflict_do_nothing(index_elements=["id"])  # Asume que 'id' es la PK
+    )
+
+    await session.execute(insert_stmt)
+
+    instance = await session.get(model, kwargs["id"])
+
+    return instance
