@@ -45,12 +45,28 @@ def override_auth_dependency(monkeypatch):
 
     monkeypatch.setattr(
         "app.routers.recommendations.Recommendations.get_recommendations",
-        lambda self, user_id: [(sample_movie, 0.9)],
+        (lambda: None),
     )
+
+    # The router awaits these service methods (they are async). Tests may
+    # patch them, so provide async functions here so `await` works.
+    async def _fake_get_recommendations(self, user_id):
+        return [(sample_movie, 0.9)]
+
+    monkeypatch.setattr(
+        "app.routers.recommendations.Recommendations.get_recommendations",
+        _fake_get_recommendations,
+    )
+
+    async def _fake_get_collaborative(self, user_id):
+        # note: some implementations accept (self, user_id) or (user_id,) when
+        # patched at the class level; this definition will receive 'self' when
+        # bound as a function on the class by monkeypatch.setattr.
+        return [{"movie": sample_movie, "score": 0.8}]
 
     monkeypatch.setattr(
         "app.routers.recommendations.Recommendations.get_collaborative_recommendations",
-        lambda self, user_id: [{"movie": sample_movie, "score": 0.8}],
+        _fake_get_collaborative,
     )
 
     yield
@@ -96,9 +112,12 @@ def test_get_collaborative_recommendations_usuario_no_existe(monkeypatch):
     app.dependency_overrides[get_current_user] = lambda: fake_user
 
     # Para este caso específico, parcheamos el método para devolver []
+    async def _fake_collab_empty(self, user_id):
+        return []
+
     monkeypatch.setattr(
         "app.routers.recommendations.Recommendations.get_collaborative_recommendations",
-        lambda self, user_id: [],
+        _fake_collab_empty,
     )
 
     response = client.get("/api/v1/recommendations/collaborative")
@@ -109,9 +128,12 @@ def test_get_collaborative_recommendations_usuario_no_existe(monkeypatch):
 
 # Test: GET /api/v1/recommendations/content (sin recomendaciones)
 def test_get_global_recommendations_sin_datos():
+    async def _fake_empty_get_recommendations(self, user_id):
+        return []
+
     with patch(
         "app.routers.recommendations.Recommendations.get_recommendations",
-        return_value=[],
+        new=_fake_empty_get_recommendations,
     ):
         response = client.get("/api/v1/recommendations/content")
         assert response.status_code == 200

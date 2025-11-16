@@ -1,6 +1,25 @@
 import pytest
 import os
 from sqlmodel import SQLModel, create_engine
+# SQLite in-memory tests need a small compiler fallback for PostgreSQL's JSONB
+# Some models use JSONB (Postgres) which the SQLite compiler doesn't know how
+# to render. During tests we create an in-memory SQLite DB, so provide a
+# tiny monkeypatch that lets the SQLite DDL compiler emit a JSON/TEXT
+# column type for JSONB so table creation succeeds.
+try:
+    from sqlalchemy.dialects.sqlite.base import SQLiteTypeCompiler as _SQLiteTypeCompiler
+
+    def _visit_JSONB(self, type_, **kw):
+        # Emit a JSON affinity type for SQLite. SQLite accepts arbitrary
+        # type names, and this keeps DDL simple for tests.
+        return "JSON"
+
+    _SQLiteTypeCompiler.visit_JSONB = _visit_JSONB
+except Exception:
+    # If this fails, tests will continue and the original error will show
+    # when attempting to create tables. We swallow here to avoid import-time
+    # crashes on environments where dialect internals differ.
+    pass
 from sqlalchemy.pool import StaticPool
 
 # Import modules para sobrescribir sus referencias a engine/get_engine
