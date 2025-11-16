@@ -1,0 +1,57 @@
+import pytest
+import os
+from sqlmodel import SQLModel, create_engine
+from sqlalchemy.pool import StaticPool
+
+# Import modules para sobrescribir sus referencias a engine/get_engine
+import app.db.utils as db_utils
+import app.db.seed as seed_module
+
+
+@pytest.fixture(scope="session", autouse=True)
+def sqlite_memory_db():
+    """Fixture global que sustituye el engine por un SQLite en memoria.
+
+    - Reemplaza `app.db.utils.engine` y `app.db.utils.get_engine` para que
+      el resto de la app use SQLite durante los tests.
+    - Reemplaza también la referencia `get_engine` dentro de `app.db.seed`
+      (seed importa `get_engine` al nivel de módulo) para asegurar que
+      el seeding se ejecute sobre el engine en memoria.
+    - Ejecuta la creación de tablas y el seeding una vez por sesión.
+    """
+    sqlite_url = "sqlite:///:memory:"
+    engine = create_engine(
+        sqlite_url,
+        connect_args={"check_same_thread": False},
+        poolclass=StaticPool,
+        echo=False,
+    )
+
+    # Sobrescribir en app.db.utils
+    db_utils.engine = engine
+    db_utils.get_engine = lambda: engine
+
+    # Sobrescribir la referencia importada dentro de seed_module
+    try:
+        seed_module.get_engine = lambda: engine
+    except Exception:
+        pass
+
+    # Crear tablas en el engine en memoria
+    SQLModel.metadata.create_all(engine)
+
+    # Intentar ejecutar el seeding (usará la referencia sobrescrita)
+    try:
+        seed_module.seed_initial_data()
+    except Exception as exc:
+        # Si el seed falla por cualquier razón, no detener la suite; los
+        # tests unitarios pueden parchear/insertar datos específicos.
+        print("Warning: seed_initial_data() falló en conftest (continuando):", exc)
+
+    yield
+
+    # Teardown
+    try:
+        engine.dispose()
+    except Exception:
+        pass
