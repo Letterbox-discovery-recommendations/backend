@@ -16,7 +16,7 @@ async def process_follow_created(session: AsyncSession, follow_data: dict):
     """
     try:
         # Validar campos requeridos
-        required_fields = ["actor_id", "target_id"]
+        required_fields = ["follower_id", "followed_id"]
         for field in required_fields:
             if field not in follow_data:
                 raise ValueError(f"Campo requerido '{field}' no encontrado")
@@ -25,8 +25,8 @@ async def process_follow_created(session: AsyncSession, follow_data: dict):
 
         # 1. Preparar los datos
         follow_values = {
-            "follower_id": str(follow_data["actor_id"]),
-            "followed_id": str(follow_data["target_id"]),
+            "follower_id": str(follow_data["follower_id"]),
+            "followed_id": str(follow_data["followed_id"]),
         }
 
         # 2. Crear el statement 'INSERT ... ON CONFLICT'
@@ -59,11 +59,11 @@ async def process_follow_deleted(session: AsyncSession, follow_data: dict):
     """
     try:
         db_follow = None
-        if "actor_id" in follow_data and "target_id" in follow_data:
+        if "follower_id" in follow_data and "unfollowed_id" in follow_data:
             follow_result = await session.exec(
                 select(Follow).where(
-                    Follow.follower_id == follow_data["actor_id"],
-                    Follow.followed_id == follow_data["target_id"],
+                    Follow.follower_id == follow_data["follower_id"],
+                    Follow.followed_id == follow_data["unfollowed_id"],
                 )
             )
             db_follow = follow_result.first()
@@ -74,7 +74,7 @@ async def process_follow_deleted(session: AsyncSession, follow_data: dict):
                 "No se proporcionaron datos suficientes para eliminar el seguimiento."
             )
             raise ValueError(
-                "Se requiere 'id' o 'follower_id' y 'followed_id' para eliminación"
+                "Se requiere 'id' o 'follower_id' y 'unfollowed_id' para eliminación"
             )
 
         if not db_follow:
